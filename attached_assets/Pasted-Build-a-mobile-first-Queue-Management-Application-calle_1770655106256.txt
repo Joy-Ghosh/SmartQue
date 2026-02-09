@@ -1,0 +1,53 @@
+Build a mobile-first "Queue Management Application" called SmartQ for patients visiting clinics.
+Tech Stack: React (Vite), Tailwind CSS, Lucide React (Icons), Framer Motion (for smooth animations), and React Router.
+
+### 1. DESIGN SYSTEM & VIBE
+* **Theme:** Medical, Trustworthy, Clean.
+* **Colors:** Primary Teal (#0F766E), Secondary Blue-Grey, Alert Orange (for "Leave Now"), Red (for Emergency).
+* **Layout:** Mobile-first layout (max-width 480px centered on screen for desktop view to simulate a phone).
+* **Typography:** Sans-serif, highly readable large numbers.
+
+### 2. DATA STRUCTURE (MOCK DATA)
+Create a `data.js` file with mock data:
+* **Clinics:** Array of objects {id, name, type (Dentist/General), address, avgWaitTimePerPatient: 10, currentQueueLength: 12, lat, lng}.
+* **Doctors:** Linked to clinics.
+* **User:** {name, location, currentTransportMode: 'car'}.
+
+### 3. CORE PAGES & FEATURES
+
+#### Page A: Onboarding & Home
+* **Header:** "Good Morning, Rahul". Location pin.
+* **Search Bar:** "Search for clinics...".
+* **Categories:** Chips for [All, Dentist, Skin, General, Labs].
+* **Clinic List:** Cards showing:
+    * Clinic Name & Doctor Name.
+    * **Live Badge:** If queue < 5, show Green "Fast Moving". If queue > 10, show Red "High Wait".
+    * **Stats:** "2.5km away" • "12 People waiting".
+
+#### Page B: Clinic Detail & Booking
+* Show Doctor info and "Today's Status" (e.g., "Dr. Sharma is In Cabin").
+* **Booking Form:**
+    * **Select Transport:** [Car (20 mins)] [Bike (15 mins)] [Walk (40 mins)]. *Hardcode these travel times for the demo.*
+    * **Toggle:** "Emergency Booking" (Turns button Red).
+    * **Action:** "Join Queue" button.
+
+#### Page C: The "Active Token" Screen (CRITICAL PAGE)
+* This is the post-booking screen.
+* **Visuals:**
+    * Big Card at top: "Your Token: #23".
+    * "Currently Serving: #12".
+    * **Progress Bar:** A visual bar filling up as the "Serving" number gets closer to "User Token".
+* **The Smart Logic Calculation:**
+    * `Total Wait Time` = (YourToken - ServingToken) * AvgWaitTime.
+    * `Time to Leave` = Total Wait Time - Travel Time - 10min Buffer.
+* **Dynamic UI State:**
+    * **State 1 (Relax):** If Time to Leave > 15 mins, show Blue UI: "Relax at home."
+    * **State 2 (Alert):** If Time to Leave <= 15 mins, show Orange UI: "Leave Now! Start Driving."
+* **Buttons:** "I'm on my way", "Snooze (Push me back 2 spots)", "Cancel".
+
+### 4. FUNCTIONALITY REQUIREMENTS
+* Use `useState` to simulate the "Currently Serving" number moving. Make it increment automatically every 5 seconds so I can see the progress bar move.
+* Use `framer-motion` to animate the progress bar and number changes.
+* Ensure the "Travel Time" selected in the booking phase updates the logic on the Active Token page.
+
+Build the complete application flow now.
