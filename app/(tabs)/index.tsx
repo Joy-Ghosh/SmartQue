@@ -9,6 +9,7 @@ import {
     Dimensions,
     TextInput,
     StatusBar,
+    Modal,
     Platform
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -25,6 +26,17 @@ import { GradientButton } from '@/components/ui/GradientButton';
 import { QueueVisualizer } from '@/components/ui/QueueVisualizer';
 
 const { width } = Dimensions.get('window');
+
+// Data for Location Selection
+const LOCATIONS = [
+    'New York',
+    'Los Angeles',
+    'Chicago',
+    'Houston',
+    'San Francisco',
+    'Miami',
+    'Seattle'
+];
 
 // Data for Category Grid with new brand colors
 const CATEGORIES = [
@@ -79,6 +91,7 @@ export default function HomeScreen() {
     const insets = useSafeAreaInsets();
     const { activeBooking } = useQueue();
     const [selectedLocation, setSelectedLocation] = useState('New York');
+    const [showLocationModal, setShowLocationModal] = useState(false);
     const [selectedCategory, setSelectedCategory] = useState('all');
 
     // Filter clinics based on selected category
@@ -126,7 +139,7 @@ export default function HomeScreen() {
             >
                 {/* 1. Top Bar */}
                 <Animated.View entering={FadeInDown.duration(600).delay(100)} style={styles.topBar}>
-                    <Pressable style={styles.locationBtn}>
+                    <Pressable style={styles.locationBtn} onPress={() => setShowLocationModal(true)}>
                         <View style={styles.locationIconBg}>
                             <Ionicons name="location" size={18} color={Colors.primary} />
                         </View>
@@ -140,7 +153,7 @@ export default function HomeScreen() {
                     </Pressable>
 
                     <View style={styles.topRightActions}>
-                        <Pressable style={styles.iconBtn}>
+                        <Pressable style={styles.iconBtn} onPress={() => router.push('/notifications')}>
                             <Ionicons name="notifications-outline" size={22} color={Colors.text} />
                             <View style={styles.notifBadge} />
                         </Pressable>
@@ -201,7 +214,7 @@ export default function HomeScreen() {
                                 />
                             </View>
                             <Image
-                                source={{ uri: 'https://cdn-icons-png.flaticon.com/512/3063/3063822.png' }}
+                                source={require('@/assets/images/ad1.png')}
                                 style={styles.heroImage}
                                 resizeMode="contain"
                             />
@@ -214,8 +227,8 @@ export default function HomeScreen() {
                     <GlassView style={styles.searchBar} intensity={20} border={false}>
                         <Ionicons name="search" size={20} color={Colors.textMuted} style={{ marginLeft: 4 }} />
                         <TextInput
-                            placeholder="Doctor, clinic, or specialty..."
-                            placeholderTextColor={Colors.textMuted}
+                            placeholder="Search doctors, clinics, services..."
+                            placeholderTextColor={Colors.textSecondary}
                             style={styles.searchInput}
                         />
                         <View style={styles.filterSeparator} />
@@ -306,6 +319,58 @@ export default function HomeScreen() {
                         ))}
                     </View>
                 </View>
+                {/* Location Selection Modal */}
+                <Modal
+                    visible={showLocationModal}
+                    transparent={true}
+                    animationType="fade"
+                    onRequestClose={() => setShowLocationModal(false)}
+                >
+                    <Pressable
+                        style={styles.modalOverlay}
+                        onPress={() => setShowLocationModal(false)}
+                    >
+                        <Animated.View
+                            entering={FadeInDown.springify().damping(15)}
+                            style={styles.modalContent}
+                        >
+                            <View style={styles.modalHeader}>
+                                <Text style={styles.modalTitle}>Select Location</Text>
+                                <Pressable onPress={() => setShowLocationModal(false)}>
+                                    <Ionicons name="close" size={24} color={Colors.textMuted} />
+                                </Pressable>
+                            </View>
+                            <View style={styles.locationsList}>
+                                {LOCATIONS.map((loc) => (
+                                    <Pressable
+                                        key={loc}
+                                        style={[
+                                            styles.locationOption,
+                                            selectedLocation === loc && styles.selectedLocationOption
+                                        ]}
+                                        onPress={() => {
+                                            setSelectedLocation(loc);
+                                            setShowLocationModal(false);
+                                        }}
+                                    >
+                                        <Ionicons
+                                            name={selectedLocation === loc ? "location" : "location-outline"}
+                                            size={20}
+                                            color={selectedLocation === loc ? Colors.primary : Colors.textMuted}
+                                        />
+                                        <Text style={[
+                                            styles.locationOptionText,
+                                            selectedLocation === loc && styles.selectedLocationOptionText
+                                        ]}>{loc}</Text>
+                                        {selectedLocation === loc && (
+                                            <Ionicons name="checkmark" size={20} color={Colors.primary} style={{ marginLeft: 'auto' }} />
+                                        )}
+                                    </Pressable>
+                                ))}
+                            </View>
+                        </Animated.View>
+                    </Pressable>
+                </Modal>
             </ScrollView>
         </View>
     );
@@ -315,6 +380,56 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: Colors.background,
+    },
+    // ... existing styles ...
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 20,
+    },
+    modalContent: {
+        backgroundColor: '#fff',
+        borderRadius: 24,
+        width: '100%',
+        maxWidth: 340,
+        padding: 20,
+        ...Colors.shadows.lg,
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 20,
+    },
+    modalTitle: {
+        fontFamily: 'Inter_700Bold',
+        fontSize: 18,
+        color: Colors.text,
+    },
+    locationsList: {
+        gap: 8,
+    },
+    locationOption: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        padding: 16,
+        borderRadius: 16,
+        backgroundColor: Colors.background,
+    },
+    selectedLocationOption: {
+        backgroundColor: '#E0F2FE',
+    },
+    locationOptionText: {
+        fontFamily: 'Inter_500Medium',
+        fontSize: 15,
+        color: Colors.text,
+    },
+    selectedLocationOptionText: {
+        color: Colors.primary,
+        fontFamily: 'Inter_600SemiBold',
     },
     topBg: {
         position: 'absolute',

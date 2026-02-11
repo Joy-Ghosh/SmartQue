@@ -1,19 +1,9 @@
 import { Tabs } from 'expo-router';
-import { BlurView } from 'expo-blur';
 import { Platform, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import Colors from '@/constants/colors';
 import * as Haptics from 'expo-haptics';
-
-function GlassTabBarBackground() {
-  return (
-    <View style={styles.tabBarBackgroundContainer}>
-      <BlurView intensity={70} tint="light" style={StyleSheet.absoluteFill} />
-      <View style={styles.tabBarBorder} />
-    </View>
-  );
-}
 
 export default function TabLayout() {
   const isIOS = Platform.OS === 'ios';
@@ -28,6 +18,7 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
+        tabBarShowLabel: true,
         tabBarActiveTintColor: Colors.primary,
         tabBarInactiveTintColor: Colors.textMuted,
         tabBarStyle: {
@@ -35,22 +26,22 @@ export default function TabLayout() {
           bottom: 0,
           left: 0,
           right: 0,
-          height: isIOS ? 88 : 68,
+          height: isIOS ? 90 : 70,
+          backgroundColor: '#fff',
           borderTopWidth: 0,
-          elevation: 0, // Remove Android shadow to handle it consistently
-          backgroundColor: isIOS ? 'transparent' : 'rgba(255,255,255,0.9)',
+          elevation: 10,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -2 },
+          shadowOpacity: 0.05,
+          shadowRadius: 10,
+          paddingTop: 10,
         },
-        tabBarBackground: () => isIOS ? <GlassTabBarBackground /> : undefined,
-        tabBarShowLabel: true,
         tabBarLabelStyle: {
           fontFamily: 'Inter_600SemiBold',
-          fontSize: 11,
-          marginTop: -4,
-          marginBottom: isIOS ? 0 : 4,
+          fontSize: 10,
+          marginTop: 4,
+          marginBottom: isIOS ? 0 : 8,
         },
-        tabBarItemStyle: {
-          paddingTop: 8,
-        }
       }}
     >
       <Tabs.Screen
@@ -58,7 +49,9 @@ export default function TabLayout() {
         options={{
           title: 'Home',
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "home" : "home-outline"} size={24} color={color} />
+            <View style={[styles.tabIconContainer, focused && styles.activeTabPopup]}>
+              <Ionicons name={focused ? "home" : "home-outline"} size={22} color={focused ? Colors.primary : color} />
+            </View>
           ),
         }}
         listeners={{ tabPress: handleTabPress }}
@@ -68,7 +61,9 @@ export default function TabLayout() {
         options={{
           title: 'Explore',
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "compass" : "compass-outline"} size={26} color={color} />
+            <View style={[styles.tabIconContainer, focused && styles.activeTabPopup]}>
+              <Ionicons name={focused ? "compass" : "compass-outline"} size={22} color={focused ? Colors.primary : color} />
+            </View>
           ),
         }}
         listeners={{ tabPress: handleTabPress }}
@@ -79,19 +74,10 @@ export default function TabLayout() {
         options={{
           title: 'Token',
           tabBarIcon: ({ color, focused }) => (
-            <View style={[
-              styles.tokenTabIcon,
-              focused && styles.tokenTabIconFocused
-            ]}>
-              <Ionicons name={focused ? "ticket" : "ticket-outline"} size={24} color={focused ? '#fff' : color} />
+            <View style={[styles.tabIconContainer, focused && styles.activeTabPopup]}>
+              <Ionicons name={focused ? "ticket" : "ticket-outline"} size={22} color={focused ? Colors.primary : color} />
             </View>
           ),
-          tabBarLabelStyle: {
-            display: 'none',
-          },
-          tabBarItemStyle: {
-            marginTop: -20, // Lift the center button
-          }
         }}
         listeners={{ tabPress: handleTabPress }}
       />
@@ -99,10 +85,11 @@ export default function TabLayout() {
       <Tabs.Screen
         name="appointments"
         options={{
-          href: null, // Hide from tab bar if not needed, or keep
           title: 'Visits',
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "calendar" : "calendar-outline"} size={24} color={color} />
+            <View style={[styles.tabIconContainer, focused && styles.activeTabPopup]}>
+              <Ionicons name={focused ? "calendar" : "calendar-outline"} size={22} color={focused ? Colors.primary : color} />
+            </View>
           )
         }}
         listeners={{ tabPress: handleTabPress }}
@@ -113,7 +100,9 @@ export default function TabLayout() {
         options={{
           title: 'Profile',
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "person" : "person-outline"} size={24} color={color} />
+            <View style={[styles.tabIconContainer, focused && styles.activeTabPopup]}>
+              <Ionicons name={focused ? "person" : "person-outline"} size={22} color={focused ? Colors.primary : color} />
+            </View>
           ),
         }}
         listeners={{ tabPress: handleTabPress }}
@@ -123,38 +112,14 @@ export default function TabLayout() {
 }
 
 const styles = StyleSheet.create({
-  tabBarBackgroundContainer: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    left: 0,
-    right: 0,
-    overflow: 'hidden',
-  },
-  tabBarBorder: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 1,
-    backgroundColor: 'rgba(0,0,0,0.05)',
-  },
-  tokenTabIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+  tabIconContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#fff',
-    ...Colors.shadows.md,
-    borderWidth: 1,
-    borderColor: Colors.borderLight,
-    top: 4,
+    width: 40,
+    height: 32,
+    borderRadius: 16,
   },
-  tokenTabIconFocused: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
-    transform: [{ scale: 1.1 }],
-    ...Colors.shadows.glow,
+  activeTabPopup: {
+    backgroundColor: '#E0F2FE', // Very light primary blue
   }
 });
