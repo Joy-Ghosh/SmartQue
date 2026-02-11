@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   StyleSheet,
   Text,
@@ -7,15 +7,27 @@ import {
   Pressable,
   Platform,
   Alert,
+  Dimensions,
+  ImageBackground,
+  StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
+import Animated, { FadeInDown, FadeInUp, withRepeat, withTiming, useSharedValue, useAnimatedStyle } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
+import { LinearGradient } from 'expo-linear-gradient';
 import Colors from '@/constants/colors';
-import { clinics, getClinicDoctor, transportModes, getQueueBadge } from '@/lib/data';
+import { clinics, getClinicDoctor, transportModes } from '@/lib/data';
 import { useQueue } from '@/lib/queue-context';
+import SmartBookingSheet from '@/components/booking/SmartBookingSheet';
+import SuccessOverlay from '@/components/booking/SuccessOverlay';
+import { GlassView } from '@/components/ui/GlassView';
+import { GradientButton } from '@/components/ui/GradientButton';
+import { StatusBadge } from '@/components/ui/StatusBadge';
+import { QueueVisualizer } from '@/components/ui/QueueVisualizer';
+
+const { width } = Dimensions.get('window');
 
 export default function ClinicDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -27,307 +39,231 @@ export default function ClinicDetailScreen() {
 
   const [selectedTransport, setSelectedTransport] = useState<'car' | 'bike' | 'walk'>('car');
   const [isEmergency, setIsEmergency] = useState(false);
-  const [activeTab, setActiveTab] = useState<'about' | 'reviews'>('about');
+  const [isBookingSheetOpen, setIsBookingSheetOpen] = useState(false);
+  const [showSuccessOverlay, setShowSuccessOverlay] = useState(false);
+  const [isWishlisted, setIsWishlisted] = useState(false);
+  const [activeTab, setActiveTab] = useState<'about' | 'reviews' | 'map'>('about');
 
-  const selectedMode = transportModes.find((m) => m.id === selectedTransport)!;
-  const badge = clinic ? getQueueBadge(clinic.currentQueueLength) : null;
+  // Mock Data
+  const currentToken = 12;
+  const yourToken = clinic ? clinic.currentQueueLength + 11 : 23;
+  const estimatedWaitMins = clinic ? clinic.currentQueueLength * clinic.avgWaitTimePerPatient : 0;
 
-  const estimatedWait = useMemo(() => {
-    if (!clinic) return 0;
-    return clinic.currentQueueLength * clinic.avgWaitTimePerPatient;
-  }, [clinic]);
+  // Pulse Animation
+  const pulseScale = useSharedValue(1);
+  useEffect(() => {
+    pulseScale.value = withRepeat(withTiming(1.05, { duration: 1500 }), -1, true);
+  }, []);
 
-  const webTopInset = Platform.OS === 'web' ? 67 : 0;
+  if (!clinic || !doctor) return <View style={styles.container}><Text>Clinic not found</Text></View>;
 
-  if (!clinic || !doctor) {
-    return (
-      <View style={[styles.container, { paddingTop: insets.top + webTopInset }]}>
-        <Text style={styles.errorText}>Clinic not found</Text>
-      </View>
-    );
-  }
+  const getStatus = (mins: number) => {
+    if (mins < 15) return 'success';
+    if (mins < 60) return 'live';
+    return 'alert';
+  };
 
-  const handleJoinQueue = () => {
+  const handleOpenBookingSheet = () => {
     if (activeBooking) {
       Alert.alert('Active Queue', 'You already have an active queue. Please cancel it first.');
       return;
     }
+    setIsBookingSheetOpen(true);
+  };
 
-    const tokenNumber = clinic.currentQueueLength + Math.floor(Math.random() * 5) + 8;
-    const servingToken = Math.floor(Math.random() * 5) + 1;
-
+  const handleConfirmBooking = (data: { patient: any; travelMode: any }) => {
+    const tokenNumber = yourToken;
     setActiveBooking({
       clinicId: clinic.id,
       clinicName: clinic.name,
       doctorName: doctor.name,
       tokenNumber,
-      servingToken,
-      transportMode: selectedTransport,
-      travelTime: selectedMode.time,
+      servingToken: currentToken,
+      transportMode: data.travelMode.id,
+      travelTime: data.travelMode.eta,
       avgWaitTime: clinic.avgWaitTimePerPatient,
       isEmergency,
       bookedAt: Date.now(),
     });
-
-    if (Platform.OS !== 'web') {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    }
-
-    router.push('/active-token');
+    setIsBookingSheetOpen(false);
+    if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setTimeout(() => setShowSuccessOverlay(true), 500);
   };
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top + webTopInset }]}>
-      <View style={styles.topBar}>
-        <Pressable style={styles.backBtn} onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={22} color={Colors.text} />
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" />
+
+      {/* Background Image Header */}
+      <View style={styles.headerBgContainer}>
+        <ImageBackground
+          source={{ uri: 'https://images.unsplash.com/photo-1629909613654-28e377c37b09?w=800&auto=format&fit=crop&q=60' }}
+          style={styles.headerImage}
+        >
+          <LinearGradient
+            colors={['rgba(0,0,0,0.3)', 'rgba(255,255,255,0)', Colors.background]}
+            locations={[0, 0.6, 1]}
+            style={StyleSheet.absoluteFill}
+          />
+        </ImageBackground>
+      </View>
+
+      {/* Nav Header */}
+      <View style={[styles.navHeader, { paddingTop: insets.top }]}>
+        <Pressable onPress={() => router.back()} style={styles.iconBtn}>
+          <Ionicons name="arrow-back" size={24} color="#fff" />
         </Pressable>
-        <Text style={styles.topTitle}>Clinic Details</Text>
-        <Pressable style={styles.backBtn}>
-          <Ionicons name="heart-outline" size={22} color={Colors.text} />
-        </Pressable>
+        <View style={styles.headerActions}>
+          <Pressable style={styles.iconBtn} onPress={() => setIsWishlisted(!isWishlisted)}>
+            <Ionicons name={isWishlisted ? "heart" : "heart-outline"} size={24} color={isWishlisted ? Colors.medicalRed : "#fff"} />
+          </Pressable>
+          <Pressable style={styles.iconBtn}>
+            <Ionicons name="share-outline" size={24} color="#fff" />
+          </Pressable>
+        </View>
       </View>
 
       <ScrollView
+        contentContainerStyle={[styles.scrollContent, { paddingTop: 200 }]}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 120 }]}
       >
-        <Animated.View entering={FadeInDown.duration(400)} style={styles.doctorCard}>
-          <View style={styles.doctorHeader}>
-            <View style={styles.doctorAvatarWrap}>
-              <Ionicons name="person" size={32} color={Colors.primary} />
-              <View style={styles.onlineDot} />
-            </View>
-            <View style={styles.doctorInfo}>
+        {/* Main Card */}
+        <GlassView style={styles.mainCard} intensity={80} gradientColors={['rgba(255,255,255,0.9)', 'rgba(255,255,255,0.95)']}>
+          <View style={styles.titleRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.clinicName}>{clinic.name}</Text>
               <Text style={styles.doctorName}>{doctor.name}</Text>
-              <Text style={styles.doctorSpecialty}>{doctor.specialty}</Text>
-              <View style={styles.ratingRow}>
-                <Ionicons name="star" size={14} color="#F59E0B" />
-                <Text style={styles.ratingVal}>{doctor.rating}</Text>
-                <Text style={styles.reviewCount}>({doctor.reviews} reviews)</Text>
-              </View>
+              <Text style={styles.specialty}>{doctor.specialty} • {doctor.experience} yrs exp</Text>
             </View>
-            <View style={styles.feeBadge}>
-              <Text style={styles.feeLabel}>{'\u20B9'}{doctor.fee}</Text>
-              <Text style={styles.feeUnit}>/visit</Text>
-            </View>
+            <StatusBadge status={getStatus(estimatedWaitMins) as any} />
           </View>
 
-          <View style={styles.doctorStats}>
-            <View style={styles.doctorStatItem}>
-              <View style={[styles.doctorStatIcon, { backgroundColor: Colors.infoBg }]}>
-                <Ionicons name="briefcase" size={16} color={Colors.info} />
-              </View>
-              <Text style={styles.doctorStatValue}>{doctor.experience} yr</Text>
-              <Text style={styles.doctorStatLabel}>Experience</Text>
-            </View>
-            <View style={styles.doctorStatItem}>
-              <View style={[styles.doctorStatIcon, { backgroundColor: Colors.successBg }]}>
-                <Ionicons name="people" size={16} color={Colors.success} />
-              </View>
-              <Text style={styles.doctorStatValue}>{doctor.patients}+</Text>
-              <Text style={styles.doctorStatLabel}>Patients</Text>
-            </View>
-            <View style={styles.doctorStatItem}>
-              <View style={[styles.doctorStatIcon, { backgroundColor: Colors.warningBg }]}>
-                <Ionicons name="chatbubbles" size={16} color={Colors.warning} />
-              </View>
-              <Text style={styles.doctorStatValue}>{doctor.reviews}</Text>
-              <Text style={styles.doctorStatLabel}>Reviews</Text>
-            </View>
-          </View>
-        </Animated.View>
+          <View style={styles.divider} />
 
-        <Animated.View entering={FadeInDown.delay(100).duration(400)} style={styles.statusCard}>
-          <View style={styles.statusHeader}>
-            <Text style={styles.statusTitle}>Today's Status</Text>
-            {badge && (
-              <View style={[styles.statusBadge, { backgroundColor: badge.bgColor }]}>
-                <View style={[styles.badgeDot, { backgroundColor: badge.color }]} />
-                <Text style={[styles.statusBadgeText, { color: badge.color }]}>{badge.label}</Text>
+          {/* Queue Live Status */}
+          <View style={styles.queueContainer}>
+            <Text style={styles.sectionTitle}>Live Queue</Text>
+            <QueueVisualizer
+              total={yourToken + 5}
+              serving={currentToken}
+              userToken={yourToken}
+              estimatedWait={estimatedWaitMins}
+            />
+          </View>
+        </GlassView>
+
+        {/* Quick Stats Grid */}
+        <View style={styles.statsGrid}>
+          <GlassView style={styles.statCard} intensity={40} gradientColors={['#fff', '#F8FAFC']}>
+            <Ionicons name="time-outline" size={24} color={Colors.primary} />
+            <Text style={styles.statValue}>{estimatedWaitMins}m</Text>
+            <Text style={styles.statLabel}>Avg Wait</Text>
+          </GlassView>
+          <GlassView style={styles.statCard} intensity={40} gradientColors={['#fff', '#F8FAFC']}>
+            <Ionicons name="star" size={24} color={Colors.smartAmber} />
+            <Text style={styles.statValue}>{doctor.rating}</Text>
+            <Text style={styles.statLabel}>Rating</Text>
+          </GlassView>
+          <GlassView style={styles.statCard} intensity={40} gradientColors={['#fff', '#F8FAFC']}>
+            <Ionicons name="location-outline" size={24} color={Colors.secondary} />
+            <Text style={styles.statValue}>{clinic.distance}</Text>
+            <Text style={styles.statLabel}>Nearby</Text>
+          </GlassView>
+        </View>
+
+        {/* Tabs / Info */}
+        <View style={styles.infoSection}>
+          <View style={styles.tabRow}>
+            {['About', 'Reviews', 'Location'].map(tab => (
+              <Pressable
+                key={tab}
+                style={[styles.tabBtn, activeTab === tab.toLowerCase() && styles.activeTabBtn]}
+                onPress={() => setActiveTab(tab.toLowerCase() as any)}
+              >
+                <Text style={[styles.tabText, activeTab === tab.toLowerCase() && styles.activeTabText]}>{tab}</Text>
+              </Pressable>
+            ))}
+          </View>
+
+          <View style={styles.tabContent}>
+            {activeTab === 'about' && (
+              <Text style={styles.bodyText}>
+                {doctor.name} is a leading {doctor.specialty} with over {doctor.experience} years of experience.
+                The clinic is equipped with modern facilities for comprehensive care.
+              </Text>
+            )}
+            {activeTab === 'reviews' && (
+              <View style={{ gap: 12 }}>
+                <Text style={styles.bodyText}>"Excellent service and accurate wait times!" - Amit S.</Text>
+                <Text style={styles.bodyText}>"Very clean facility." - Priya K.</Text>
+              </View>
+            )}
+            {activeTab === 'location' && (
+              <View style={styles.mapPreview}>
+                <Ionicons name="map" size={40} color={Colors.textMuted} />
+                <Text style={styles.bodyText}>Map View Placeholder</Text>
               </View>
             )}
           </View>
-          <View style={styles.statusGrid}>
-            <View style={styles.statusItem}>
-              <Ionicons name="medical" size={18} color={Colors.primary} />
-              <Text style={styles.statusLabel}>Doctor Status</Text>
-              <Text style={[styles.statusValue, { color: doctor.status === 'In Cabin' ? Colors.success : Colors.warning }]}>
-                {doctor.status}
-              </Text>
-            </View>
-            <View style={styles.statusItem}>
-              <Ionicons name="people" size={18} color={Colors.primary} />
-              <Text style={styles.statusLabel}>In Queue</Text>
-              <Text style={styles.statusValue}>{clinic.currentQueueLength} people</Text>
-            </View>
-            <View style={styles.statusItem}>
-              <Ionicons name="time" size={18} color={Colors.primary} />
-              <Text style={styles.statusLabel}>Est. Wait</Text>
-              <Text style={styles.statusValue}>~{estimatedWait} min</Text>
-            </View>
-            <View style={styles.statusItem}>
-              <Ionicons name="location" size={18} color={Colors.primary} />
-              <Text style={styles.statusLabel}>Distance</Text>
-              <Text style={styles.statusValue}>{clinic.distance} km</Text>
-            </View>
-          </View>
-        </Animated.View>
+        </View>
 
-        <Animated.View entering={FadeInDown.delay(150).duration(400)} style={styles.tabsSection}>
-          <View style={styles.tabsRow}>
-            <Pressable
-              style={[styles.tab, activeTab === 'about' && styles.tabActive]}
-              onPress={() => setActiveTab('about')}
-            >
-              <Ionicons
-                name="information-circle-outline"
-                size={16}
-                color={activeTab === 'about' ? Colors.primary : Colors.textSecondary}
-              />
-              <Text style={[styles.tabText, activeTab === 'about' && styles.tabTextActive]}>About</Text>
-            </Pressable>
-            <Pressable
-              style={[styles.tab, activeTab === 'reviews' && styles.tabActive]}
-              onPress={() => setActiveTab('reviews')}
-            >
-              <Ionicons
-                name="star-outline"
-                size={16}
-                color={activeTab === 'reviews' ? Colors.primary : Colors.textSecondary}
-              />
-              <Text style={[styles.tabText, activeTab === 'reviews' && styles.tabTextActive]}>Reviews</Text>
-            </Pressable>
-          </View>
-
-          {activeTab === 'about' && (
-            <View style={styles.aboutContent}>
-              <View style={styles.aboutRow}>
-                <Ionicons name="location-outline" size={16} color={Colors.textSecondary} />
-                <Text style={styles.aboutText}>{clinic.address}</Text>
-              </View>
-              <View style={styles.aboutRow}>
-                <Ionicons name="time-outline" size={16} color={Colors.textSecondary} />
-                <Text style={styles.aboutText}>Mon - Sat: 9:00 AM - 8:00 PM</Text>
-              </View>
-              <View style={styles.aboutRow}>
-                <Ionicons name="call-outline" size={16} color={Colors.textSecondary} />
-                <Text style={styles.aboutText}>+91 98765 43210</Text>
-              </View>
-              <Text style={styles.aboutPara}>
-                {clinic.name} offers comprehensive healthcare services with modern equipment and experienced medical professionals. Our priority is patient comfort and quality care.
-              </Text>
-            </View>
-          )}
-
-          {activeTab === 'reviews' && (
-            <View style={styles.reviewsContent}>
-              {[
-                { name: 'Sneha Patil', text: 'Very polite doctor. Treatment was effective and quick.', stars: 5 },
-                { name: 'Ankit Sharma', text: 'Good experience overall. Reasonable consultation fees.', stars: 4 },
-                { name: 'Nisha Kulkarni', text: 'Clean clinic, minimal wait time. Highly recommended.', stars: 5 },
-              ].map((review, i) => (
-                <View key={i} style={styles.reviewCard}>
-                  <View style={styles.reviewHeader}>
-                    <View style={styles.reviewAvatar}>
-                      <Text style={styles.reviewAvatarText}>{review.name[0]}</Text>
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.reviewName}>{review.name}</Text>
-                      <View style={styles.starsRow}>
-                        {[1, 2, 3, 4, 5].map((s) => (
-                          <Ionicons
-                            key={s}
-                            name={s <= review.stars ? 'star' : 'star-outline'}
-                            size={12}
-                            color="#F59E0B"
-                          />
-                        ))}
-                      </View>
-                    </View>
-                  </View>
-                  <Text style={styles.reviewText}>{review.text}</Text>
-                </View>
-              ))}
-            </View>
-          )}
-        </Animated.View>
-
-        <Animated.View entering={FadeInDown.delay(200).duration(400)}>
-          <Text style={styles.sectionTitle}>Select Transport Mode</Text>
-          <View style={styles.transportRow}>
-            {transportModes.map((mode) => {
-              const isActive = selectedTransport === mode.id;
-              return (
-                <Pressable
-                  key={mode.id}
-                  style={[styles.transportCard, isActive && styles.transportCardActive]}
-                  onPress={() => {
-                    setSelectedTransport(mode.id);
-                    if (Platform.OS !== 'web') {
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    }
-                  }}
-                >
-                  <Ionicons
-                    name={mode.icon as any}
-                    size={24}
-                    color={isActive ? Colors.primary : Colors.textSecondary}
-                  />
-                  <Text style={[styles.transportLabel, isActive && styles.transportLabelActive]}>
-                    {mode.label}
-                  </Text>
-                  <Text style={[styles.transportTime, isActive && styles.transportTimeActive]}>
-                    {mode.time} min
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        </Animated.View>
-
-        <Animated.View entering={FadeInDown.delay(250).duration(400)}>
-          <Pressable
-            style={styles.emergencyToggle}
-            onPress={() => {
-              setIsEmergency(!isEmergency);
-              if (Platform.OS !== 'web') {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-              }
-            }}
-          >
-            <View style={styles.emergencyLeft}>
-              <View style={[styles.emergencyIcon, isEmergency && styles.emergencyIconActive]}>
-                <Ionicons name="alert-circle" size={20} color={isEmergency ? '#fff' : Colors.danger} />
-              </View>
-              <View>
-                <Text style={styles.emergencyLabel}>Emergency Booking</Text>
-                <Text style={styles.emergencySub}>Priority queue placement</Text>
-              </View>
-            </View>
-            <View style={[styles.toggleTrack, isEmergency && styles.toggleTrackActive]}>
-              <View style={[styles.toggleThumb, isEmergency && styles.toggleThumbActive]} />
-            </View>
-          </Pressable>
-        </Animated.View>
+        <View style={{ height: 100 }} />
       </ScrollView>
 
-      <Animated.View
-        entering={FadeInUp.delay(300).duration(400)}
-        style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 20) + (Platform.OS === 'web' ? 34 : 0) }]}
-      >
-        <View style={styles.bottomInfo}>
-          <Text style={styles.bottomWait}>Wait: ~{estimatedWait} min</Text>
-          <Text style={styles.bottomTravel}>Travel: {selectedMode.time} min by {selectedMode.label}</Text>
+      {/* Bottom Action Bar */}
+      <GlassView style={[styles.bottomBar, { paddingBottom: insets.bottom + 10 }]} intensity={95} gradientColors={['rgba(255,255,255,0.9)', '#fff']}>
+        <View style={styles.bottomBarContent}>
+          <View>
+            <Text style={styles.priceLabel}>Consultation</Text>
+            <Text style={styles.priceValue}>₹500</Text>
+          </View>
+          <View style={styles.buttonGroup}>
+            <Pressable
+              style={styles.emergencyBtn}
+              onPress={() => {
+                if (activeBooking) {
+                  Alert.alert('Active Queue', 'You already have an active queue. Please cancel it first.');
+                  return;
+                }
+                setIsEmergency(true);
+                setIsBookingSheetOpen(true);
+              }}
+            >
+              <Ionicons name="warning" size={18} color={Colors.danger} />
+            </Pressable>
+            <GradientButton
+              title="Book Token"
+              onPress={handleOpenBookingSheet}
+              style={{ flex: 1 }}
+              icon="ticket-outline"
+            />
+          </View>
         </View>
-        <Pressable
-          style={[styles.joinBtn, isEmergency && styles.joinBtnEmergency]}
-          onPress={handleJoinQueue}
-        >
-          <Ionicons name={isEmergency ? 'alert-circle' : 'add-circle'} size={20} color="#fff" />
-          <Text style={styles.joinBtnText}>{isEmergency ? 'Emergency Join' : 'Join Queue'}</Text>
-        </Pressable>
-      </Animated.View>
+      </GlassView>
+
+      <SmartBookingSheet
+        isOpen={isBookingSheetOpen}
+        onClose={() => {
+          setIsBookingSheetOpen(false);
+          setIsEmergency(false);
+        }}
+        onConfirm={handleConfirmBooking}
+        consultationFee={isEmergency ? 700 : 500}
+        isEmergency={isEmergency}
+      />
+
+      <SuccessOverlay
+        visible={showSuccessOverlay}
+        tokenNumber={yourToken}
+        doctorName={doctor.name}
+        clinicName={clinic.name}
+        estimatedTime="5:15 PM"
+        onClose={() => {
+          setShowSuccessOverlay(false);
+          router.replace('/active-token');
+        }}
+      />
+
     </View>
   );
 }
@@ -337,436 +273,191 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.background,
   },
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+  headerBgContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 350,
   },
-  backBtn: {
+  headerImage: {
+    width: '100%',
+    height: '100%',
+  },
+  navHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    zIndex: 10,
+  },
+  iconBtn: {
     width: 40,
     height: 40,
-    borderRadius: 12,
-    backgroundColor: Colors.surface,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.3)',
     alignItems: 'center',
     justifyContent: 'center',
+    backdropFilter: 'blur(10px)',
   },
-  topTitle: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 17,
-    color: Colors.text,
+  headerActions: {
+    flexDirection: 'row',
+    gap: 12,
   },
   scrollContent: {
     paddingHorizontal: 20,
+    paddingBottom: 40,
   },
-  errorText: {
-    fontFamily: 'Inter_500Medium',
-    fontSize: 16,
-    color: Colors.textSecondary,
-    textAlign: 'center',
-    marginTop: 100,
-  },
-  doctorCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: 20,
+  mainCard: {
+    borderRadius: 24,
     padding: 20,
-    marginBottom: 16,
-    shadowColor: Colors.cardShadow,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius: 12,
-    elevation: 3,
+    ...Colors.shadows.lg,
+    marginBottom: 20,
   },
-  doctorHeader: {
+  titleRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    marginBottom: 16,
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
   },
-  doctorAvatarWrap: {
-    width: 64,
-    height: 64,
-    borderRadius: 20,
-    backgroundColor: Colors.primaryBg,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  onlineDot: {
-    position: 'absolute',
-    bottom: 2,
-    right: 2,
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: Colors.success,
-    borderWidth: 2,
-    borderColor: Colors.surface,
-  },
-  doctorInfo: {
-    flex: 1,
+  clinicName: {
+    fontSize: 14,
+    fontFamily: 'Inter_500Medium',
+    color: Colors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 4,
   },
   doctorName: {
+    fontSize: 22,
     fontFamily: 'Inter_700Bold',
-    fontSize: 18,
     color: Colors.text,
+    marginBottom: 2,
   },
-  doctorSpecialty: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 13,
-    color: Colors.textSecondary,
-    marginTop: 2,
-  },
-  ratingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 4,
-  },
-  ratingVal: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 13,
-    color: Colors.text,
-  },
-  reviewCount: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 12,
-    color: Colors.textMuted,
-  },
-  feeBadge: {
-    alignItems: 'flex-end',
-  },
-  feeLabel: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 20,
-    color: Colors.primary,
-  },
-  feeUnit: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 11,
-    color: Colors.textMuted,
-  },
-  doctorStats: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  doctorStatItem: {
-    flex: 1,
-    alignItems: 'center',
-    backgroundColor: Colors.background,
-    borderRadius: 14,
-    padding: 12,
-  },
-  doctorStatIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 6,
-  },
-  doctorStatValue: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 15,
-    color: Colors.text,
-  },
-  doctorStatLabel: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 11,
-    color: Colors.textSecondary,
-    marginTop: 2,
-  },
-  statusCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
-  },
-  statusHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  statusTitle: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 16,
-    color: Colors.text,
-  },
-  statusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  badgeDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  statusBadgeText: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 11,
-  },
-  statusGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  statusItem: {
-    width: '47%' as any,
-    backgroundColor: Colors.primaryBg,
-    borderRadius: 12,
-    padding: 12,
-    gap: 4,
-  },
-  statusLabel: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 11,
-    color: Colors.textSecondary,
-  },
-  statusValue: {
-    fontFamily: 'Inter_600SemiBold',
+  specialty: {
     fontSize: 14,
-    color: Colors.text,
-  },
-  tabsSection: {
-    backgroundColor: Colors.surface,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 20,
-  },
-  tabsRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 14,
-  },
-  tab: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 10,
-    borderRadius: 10,
-    backgroundColor: Colors.background,
-  },
-  tabActive: {
-    backgroundColor: Colors.primaryBg,
-  },
-  tabText: {
     fontFamily: 'Inter_500Medium',
-    fontSize: 13,
-    color: Colors.textSecondary,
+    color: Colors.textMuted,
+    marginBottom: 4,
   },
-  tabTextActive: {
-    color: Colors.primary,
+  divider: {
+    height: 1,
+    backgroundColor: Colors.borderLight,
+    marginVertical: 16,
   },
-  aboutContent: {
-    gap: 10,
-  },
-  aboutRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  aboutText: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 13,
-    color: Colors.textSecondary,
-    flex: 1,
-  },
-  aboutPara: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 13,
-    color: Colors.textSecondary,
-    lineHeight: 20,
-    marginTop: 6,
-  },
-  reviewsContent: {
-    gap: 10,
-  },
-  reviewCard: {
-    backgroundColor: Colors.background,
-    borderRadius: 12,
-    padding: 12,
-  },
-  reviewHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginBottom: 8,
-  },
-  reviewAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: Colors.primaryBg,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  reviewAvatarText: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 13,
-    color: Colors.primary,
-  },
-  reviewName: {
-    fontFamily: 'Inter_500Medium',
-    fontSize: 13,
-    color: Colors.text,
-  },
-  starsRow: {
-    flexDirection: 'row',
-    gap: 1,
-    marginTop: 2,
-  },
-  reviewText: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 12,
-    color: Colors.textSecondary,
-    lineHeight: 18,
+  queueContainer: {
+    gap: 12,
   },
   sectionTitle: {
-    fontFamily: 'Inter_600SemiBold',
     fontSize: 16,
+    fontFamily: 'Inter_600SemiBold',
     color: Colors.text,
-    marginBottom: 10,
   },
-  transportRow: {
+  statsGrid: {
     flexDirection: 'row',
-    gap: 10,
-    marginBottom: 16,
+    gap: 12,
+    marginBottom: 24,
   },
-  transportCard: {
+  statCard: {
     flex: 1,
+    borderRadius: 16,
+    padding: 16,
     alignItems: 'center',
-    backgroundColor: Colors.surface,
-    borderRadius: 14,
-    padding: 14,
+    justifyContent: 'center',
     gap: 6,
-    borderWidth: 2,
-    borderColor: Colors.border,
+    ...Colors.shadows.sm,
   },
-  transportCardActive: {
-    borderColor: Colors.primary,
-    backgroundColor: Colors.primaryBg,
+  statValue: {
+    fontSize: 16,
+    fontFamily: 'Inter_700Bold',
+    color: Colors.text,
   },
-  transportLabel: {
+  statLabel: {
+    fontSize: 12,
     fontFamily: 'Inter_500Medium',
-    fontSize: 13,
     color: Colors.textSecondary,
   },
-  transportLabelActive: {
-    color: Colors.primary,
+  infoSection: {
+    marginTop: 0,
   },
-  transportTime: {
+  tabRow: {
+    flexDirection: 'row',
+    marginBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.borderLight,
+  },
+  tabBtn: {
+    paddingVertical: 10,
+    marginRight: 24,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  activeTabBtn: {
+    borderBottomColor: Colors.primary,
+  },
+  tabText: {
+    fontSize: 14,
     fontFamily: 'Inter_600SemiBold',
-    fontSize: 12,
     color: Colors.textMuted,
   },
-  transportTimeActive: {
-    color: Colors.primaryDark,
+  activeTabText: {
+    color: Colors.primary,
   },
-  emergencyToggle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: Colors.surface,
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 20,
+  tabContent: {
+    minHeight: 100,
   },
-  emergencyLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  emergencyIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: Colors.dangerBg,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emergencyIconActive: {
-    backgroundColor: Colors.danger,
-  },
-  emergencyLabel: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 14,
-    color: Colors.text,
-  },
-  emergencySub: {
+  bodyText: {
+    fontSize: 15,
     fontFamily: 'Inter_400Regular',
-    fontSize: 12,
     color: Colors.textSecondary,
+    lineHeight: 24,
   },
-  toggleTrack: {
-    width: 48,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: Colors.border,
+  mapPreview: {
+    height: 150,
+    backgroundColor: Colors.borderLight,
+    borderRadius: 16,
+    alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 3,
-  },
-  toggleTrackActive: {
-    backgroundColor: Colors.danger,
-  },
-  toggleThumb: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: '#fff',
-  },
-  toggleThumbActive: {
-    alignSelf: 'flex-end' as const,
+    gap: 8,
   },
   bottomBar: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: Colors.surface,
-    paddingHorizontal: 20,
     paddingTop: 16,
+    paddingHorizontal: 20,
     borderTopWidth: 1,
-    borderTopColor: Colors.borderLight,
+    borderTopColor: 'rgba(0,0,0,0.05)',
+  },
+  bottomBarContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
+    justifyContent: 'space-between',
   },
-  bottomInfo: {
-    flex: 1,
+  priceLabel: {
+    fontSize: 12,
+    fontFamily: 'Inter_500Medium',
+    color: Colors.textMuted,
   },
-  bottomWait: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 14,
+  priceValue: {
+    fontSize: 20,
+    fontFamily: 'Inter_700Bold',
     color: Colors.text,
   },
-  bottomTravel: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 12,
-    color: Colors.textSecondary,
-    marginTop: 2,
-  },
-  joinBtn: {
+  buttonGroup: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    backgroundColor: Colors.primary,
-    paddingHorizontal: 24,
-    paddingVertical: 14,
-    borderRadius: 14,
+    gap: 12,
+    flex: 1,
+    marginLeft: 20,
   },
-  joinBtnEmergency: {
-    backgroundColor: Colors.danger,
-  },
-  joinBtnText: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 15,
-    color: '#fff',
+  emergencyBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: Colors.dangerBg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: Colors.medicalRed + '20',
   },
 });

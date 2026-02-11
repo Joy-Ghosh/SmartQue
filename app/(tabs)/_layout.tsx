@@ -1,91 +1,160 @@
-import { isLiquidGlassAvailable } from 'expo-glass-effect';
 import { Tabs } from 'expo-router';
-import { NativeTabs, Icon, Label } from 'expo-router/unstable-native-tabs';
 import { BlurView } from 'expo-blur';
-import { Platform, StyleSheet, useColorScheme, View } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import Colors from '@/constants/colors';
+import * as Haptics from 'expo-haptics';
 
-function NativeTabLayout() {
+function GlassTabBarBackground() {
   return (
-    <NativeTabs>
-      <NativeTabs.Trigger name="index">
-        <Icon sf={{ default: 'house', selected: 'house.fill' }} />
-        <Label>Home</Label>
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="appointments">
-        <Icon sf={{ default: 'calendar', selected: 'calendar' }} />
-        <Label>Appointments</Label>
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="profile">
-        <Icon sf={{ default: 'person', selected: 'person.fill' }} />
-        <Label>Profile</Label>
-      </NativeTabs.Trigger>
-    </NativeTabs>
+    <View style={styles.tabBarBackgroundContainer}>
+      <BlurView intensity={70} tint="light" style={StyleSheet.absoluteFill} />
+      <View style={styles.tabBarBorder} />
+    </View>
   );
 }
 
-function ClassicTabLayout() {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
-  const isWeb = Platform.OS === 'web';
+export default function TabLayout() {
   const isIOS = Platform.OS === 'ios';
+
+  const handleTabPress = () => {
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+  };
 
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors.primary,
-        tabBarInactiveTintColor: Colors.light.tabIconDefault,
         headerShown: false,
+        tabBarActiveTintColor: Colors.primary,
+        tabBarInactiveTintColor: Colors.textMuted,
         tabBarStyle: {
-          position: 'absolute' as const,
-          backgroundColor: isIOS ? 'transparent' : isDark ? '#000' : '#fff',
-          borderTopWidth: isWeb ? 1 : 0,
-          borderTopColor: isDark ? '#333' : Colors.border,
-          elevation: 0,
-          ...(isWeb ? { height: 84 } : {}),
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          height: isIOS ? 88 : 68,
+          borderTopWidth: 0,
+          elevation: 0, // Remove Android shadow to handle it consistently
+          backgroundColor: isIOS ? 'transparent' : 'rgba(255,255,255,0.9)',
         },
+        tabBarBackground: () => isIOS ? <GlassTabBarBackground /> : undefined,
+        tabBarShowLabel: true,
         tabBarLabelStyle: {
-          fontFamily: 'Inter_500Medium',
+          fontFamily: 'Inter_600SemiBold',
           fontSize: 11,
+          marginTop: -4,
+          marginBottom: isIOS ? 0 : 4,
         },
-        tabBarBackground: () =>
-          isIOS ? (
-            <BlurView intensity={100} tint={isDark ? 'dark' : 'light'} style={StyleSheet.absoluteFill} />
-          ) : isWeb ? (
-            <View style={[StyleSheet.absoluteFill, { backgroundColor: isDark ? '#000' : '#fff' }]} />
-          ) : null,
+        tabBarItemStyle: {
+          paddingTop: 8,
+        }
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
           title: 'Home',
-          tabBarIcon: ({ color, size }) => <Ionicons name="home" size={size} color={color} />,
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? "home" : "home-outline"} size={24} color={color} />
+          ),
         }}
+        listeners={{ tabPress: handleTabPress }}
       />
+      <Tabs.Screen
+        name="search"
+        options={{
+          title: 'Explore',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? "compass" : "compass-outline"} size={26} color={color} />
+          ),
+        }}
+        listeners={{ tabPress: handleTabPress }}
+      />
+
+      <Tabs.Screen
+        name="token"
+        options={{
+          title: 'Token',
+          tabBarIcon: ({ color, focused }) => (
+            <View style={[
+              styles.tokenTabIcon,
+              focused && styles.tokenTabIconFocused
+            ]}>
+              <Ionicons name={focused ? "ticket" : "ticket-outline"} size={24} color={focused ? '#fff' : color} />
+            </View>
+          ),
+          tabBarLabelStyle: {
+            display: 'none',
+          },
+          tabBarItemStyle: {
+            marginTop: -20, // Lift the center button
+          }
+        }}
+        listeners={{ tabPress: handleTabPress }}
+      />
+
       <Tabs.Screen
         name="appointments"
         options={{
-          title: 'Appointments',
-          tabBarIcon: ({ color, size }) => <Ionicons name="calendar" size={size} color={color} />,
+          href: null, // Hide from tab bar if not needed, or keep
+          title: 'Visits',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? "calendar" : "calendar-outline"} size={24} color={color} />
+          )
         }}
+        listeners={{ tabPress: handleTabPress }}
       />
+
       <Tabs.Screen
         name="profile"
         options={{
           title: 'Profile',
-          tabBarIcon: ({ color, size }) => <Ionicons name="person" size={size} color={color} />,
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? "person" : "person-outline"} size={24} color={color} />
+          ),
         }}
+        listeners={{ tabPress: handleTabPress }}
       />
     </Tabs>
   );
 }
 
-export default function TabLayout() {
-  if (isLiquidGlassAvailable()) {
-    return <NativeTabLayout />;
+const styles = StyleSheet.create({
+  tabBarBackgroundContainer: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    overflow: 'hidden',
+  },
+  tabBarBorder: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 1,
+    backgroundColor: 'rgba(0,0,0,0.05)',
+  },
+  tokenTabIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fff',
+    ...Colors.shadows.md,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+    top: 4,
+  },
+  tokenTabIconFocused: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+    transform: [{ scale: 1.1 }],
+    ...Colors.shadows.glow,
   }
-  return <ClassicTabLayout />;
-}
+});

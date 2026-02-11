@@ -1,93 +1,171 @@
 import React from 'react';
-import { StyleSheet, Text, View, ScrollView, Pressable, Platform } from 'react-native';
+import { StyleSheet, Text, View, ScrollView, Pressable, Image, Platform, Switch } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import Colors from '@/constants/colors';
 import { user } from '@/lib/data';
 import { useQueue } from '@/lib/queue-context';
+import { GlassView } from '@/components/ui/GlassView';
 
 interface MenuItemProps {
   icon: keyof typeof Ionicons.glyphMap;
   label: string;
   subtitle?: string;
   color?: string;
+  onPress?: () => void;
+  isSwitch?: boolean;
 }
 
-function MenuItem({ icon, label, subtitle, color }: MenuItemProps) {
+function MenuItem({ icon, label, subtitle, color = Colors.primary, onPress, isSwitch }: MenuItemProps) {
   return (
-    <Pressable style={({ pressed }) => [styles.menuItem, pressed && { opacity: 0.7 }]}>
-      <View style={[styles.menuIconWrap, { backgroundColor: (color || Colors.primary) + '15' }]}>
-        <Ionicons name={icon} size={20} color={color || Colors.primary} />
+    <Pressable
+      style={({ pressed }) => [styles.menuItem, pressed && !isSwitch && { opacity: 0.7, transform: [{ scale: 0.99 }] }]}
+      onPress={!isSwitch ? onPress : undefined}
+    >
+      <View style={[styles.menuIconWrap, { backgroundColor: color + '15' }]}>
+        <Ionicons name={icon} size={22} color={color} />
       </View>
       <View style={styles.menuTextWrap}>
         <Text style={styles.menuLabel}>{label}</Text>
         {subtitle && <Text style={styles.menuSub}>{subtitle}</Text>}
       </View>
-      <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
+      {isSwitch ? (
+        <Switch
+          trackColor={{ false: Colors.borderLight, true: Colors.primary }}
+          thumbColor={'#fff'}
+          ios_backgroundColor={Colors.borderLight}
+          style={{ transform: [{ scale: 0.8 }] }}
+          value={true}
+        />
+      ) : (
+        <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
+      )}
     </Pressable>
   );
 }
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const { pastBookings } = useQueue();
-  const webTopInset = Platform.OS === 'web' ? 67 : 0;
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top + webTopInset }]}>
+    <View style={styles.container}>
+      {/* Background Gradient */}
+      <View style={styles.headerBg}>
+        <LinearGradient colors={['#F0F9FF', '#F8FAFC']} style={StyleSheet.absoluteFill} />
+        <View style={styles.blob1} />
+        <View style={styles.blob2} />
+      </View>
+
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 100 }]}
-        contentInsetAdjustmentBehavior="automatic"
+        contentContainerStyle={[
+          styles.scrollContent,
+          {
+            paddingTop: insets.top + 20,
+            paddingBottom: 120
+          }
+        ]}
       >
-        <View style={styles.profileCard}>
-          <View style={styles.avatarWrap}>
-            <Text style={styles.avatarText}>
-              {user.name.split(' ').map((n) => n[0]).join('')}
-            </Text>
+        <GlassView style={styles.profileCard} intensity={70} gradientColors={['rgba(255,255,255,0.8)', 'rgba(255,255,255,0.95)']} border>
+          <View style={styles.headerTop}>
+            <View style={styles.avatarContainer}>
+              <LinearGradient
+                colors={Colors.gradients.primary}
+                style={styles.avatarGradient}
+              >
+                <Text style={styles.avatarText}>
+                  {user.name.split(' ').map((n) => n[0]).join('')}
+                </Text>
+              </LinearGradient>
+              <Pressable style={styles.editBadge}>
+                <Ionicons name="pencil" size={12} color="#fff" />
+              </Pressable>
+            </View>
+
+            <View style={styles.userInfo}>
+              <Text style={styles.profileName}>{user.name}</Text>
+              <View style={styles.locationTag}>
+                <Ionicons name="location" size={12} color={Colors.textSecondary} />
+                <Text style={styles.profileLocation}>{user.location}</Text>
+              </View>
+            </View>
           </View>
-          <Text style={styles.profileName}>{user.name}</Text>
-          <View style={styles.profileLocationRow}>
-            <Ionicons name="location" size={14} color={Colors.primary} />
-            <Text style={styles.profileLocation}>{user.location}</Text>
-          </View>
+
           <View style={styles.statsRow}>
-            <View style={styles.statBox}>
+            <View style={styles.statItem}>
               <Text style={styles.statNum}>{pastBookings.length}</Text>
               <Text style={styles.statLabel}>Visits</Text>
             </View>
             <View style={styles.statDivider} />
-            <View style={styles.statBox}>
+            <View style={styles.statItem}>
               <Text style={styles.statNum}>3</Text>
               <Text style={styles.statLabel}>Saved</Text>
             </View>
             <View style={styles.statDivider} />
-            <View style={styles.statBox}>
+            <View style={styles.statItem}>
               <Text style={styles.statNum}>4.9</Text>
               <Text style={styles.statLabel}>Rating</Text>
             </View>
           </View>
+        </GlassView>
+
+        {/* Menu Sections */}
+        <View style={styles.menuGroup}>
+          <Text style={styles.groupTitle}>My Account</Text>
+          <GlassView intensity={50} style={styles.menuList} border>
+            <MenuItem
+              icon="calendar-outline"
+              label="My Appointments"
+              subtitle="Upcoming & History"
+              onPress={() => router.push('/appointments')}
+            />
+            <View style={styles.menuDivider} />
+            <MenuItem
+              icon="heart-outline"
+              label="Saved Clinics"
+              color={Colors.medicalRed}
+              onPress={() => { }}
+            />
+            <View style={styles.menuDivider} />
+            <MenuItem
+              icon="wallet-outline"
+              label="Payment Methods"
+              color={Colors.secondary}
+              onPress={() => { }}
+            />
+          </GlassView>
         </View>
 
-        <View style={styles.menuSection}>
-          <Text style={styles.menuSectionTitle}>Account</Text>
-          <MenuItem icon="person-outline" label="Personal Info" subtitle="Name, phone, email" />
-          <MenuItem icon="card-outline" label="Payment Methods" subtitle="Cards, UPI" />
-          <MenuItem icon="heart-outline" label="Saved Clinics" subtitle="3 clinics saved" color="#EF4444" />
+        <View style={styles.menuGroup}>
+          <Text style={styles.groupTitle}>Preferences</Text>
+          <GlassView intensity={50} style={styles.menuList} border>
+            <MenuItem
+              icon="notifications-outline"
+              label="Push Notifications"
+              color={Colors.smartAmber}
+              isSwitch
+            />
+            <View style={styles.menuDivider} />
+            <MenuItem
+              icon="moon-outline"
+              label="Dark Mode"
+              color={Colors.primary}
+              isSwitch
+            />
+          </GlassView>
         </View>
 
-        <View style={styles.menuSection}>
-          <Text style={styles.menuSectionTitle}>Preferences</Text>
-          <MenuItem icon="notifications-outline" label="Notifications" subtitle="Push, SMS, Email" color="#F59E0B" />
-          <MenuItem icon="globe-outline" label="Language" subtitle="English" color="#3B82F6" />
-          <MenuItem icon="moon-outline" label="Appearance" subtitle="Light mode" color="#8B5CF6" />
-        </View>
-
-        <View style={styles.menuSection}>
-          <Text style={styles.menuSectionTitle}>Support</Text>
-          <MenuItem icon="help-circle-outline" label="Help Center" color="#10B981" />
-          <MenuItem icon="chatbubble-outline" label="Contact Us" color="#06B6D4" />
-          <MenuItem icon="document-text-outline" label="Terms & Privacy" color={Colors.secondary} />
+        <View style={styles.menuGroup}>
+          <Text style={styles.groupTitle}>Support</Text>
+          <GlassView intensity={50} style={styles.menuList} border>
+            <MenuItem icon="help-circle-outline" label="Help Center" onPress={() => { }} />
+            <View style={styles.menuDivider} />
+            <MenuItem icon="document-text-outline" label="Terms & Privacy" onPress={() => { }} />
+          </GlassView>
         </View>
 
         <Pressable style={styles.logoutBtn}>
@@ -95,7 +173,8 @@ export default function ProfileScreen() {
           <Text style={styles.logoutText}>Sign Out</Text>
         </Pressable>
 
-        <Text style={styles.version}>SmartQ v1.0.0</Text>
+        <Text style={styles.version}>SmartQ v1.2.0 • Build 4502</Text>
+
       </ScrollView>
     </View>
   );
@@ -106,59 +185,108 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.background,
   },
+  headerBg: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 400,
+    zIndex: -1,
+  },
+  blob1: {
+    position: 'absolute',
+    top: -100,
+    right: -50,
+    width: 300,
+    height: 300,
+    borderRadius: 150,
+    backgroundColor: Colors.secondary + '20', // check opacity
+  },
+  blob2: {
+    position: 'absolute',
+    top: 50,
+    left: -50,
+    width: 250,
+    height: 250,
+    borderRadius: 125,
+    backgroundColor: Colors.primary + '10',
+  },
   scrollContent: {
     paddingHorizontal: 20,
+    gap: 24,
   },
   profileCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: 20,
+    borderRadius: 24,
     padding: 24,
-    alignItems: 'center',
-    marginTop: 8,
-    marginBottom: 24,
-    shadowColor: Colors.cardShadow,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius: 12,
-    elevation: 3,
+    ...Colors.shadows.md,
   },
-  avatarWrap: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: Colors.primary,
+  headerTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 20,
+    marginBottom: 24,
+  },
+  avatarContainer: {
+    position: 'relative',
+  },
+  avatarGradient: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 12,
+    ...Colors.shadows.md,
   },
   avatarText: {
     fontFamily: 'Inter_700Bold',
-    fontSize: 24,
+    fontSize: 28,
     color: '#fff',
+  },
+  editBadge: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    backgroundColor: Colors.text,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#fff',
+  },
+  userInfo: {
+    flex: 1,
   },
   profileName: {
     fontFamily: 'Inter_700Bold',
-    fontSize: 20,
+    fontSize: 22,
     color: Colors.text,
+    marginBottom: 4,
   },
-  profileLocationRow: {
+  locationTag: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    marginTop: 4,
-    marginBottom: 20,
+    backgroundColor: 'rgba(0,0,0,0.05)',
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
   },
   profileLocation: {
-    fontFamily: 'Inter_400Regular',
+    fontFamily: 'Inter_500Medium',
     fontSize: 13,
     color: Colors.textSecondary,
   },
   statsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    width: '100%',
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.05)',
   },
-  statBox: {
+  statItem: {
     flex: 1,
     alignItems: 'center',
   },
@@ -168,40 +296,42 @@ const styles = StyleSheet.create({
     color: Colors.text,
   },
   statLabel: {
-    fontFamily: 'Inter_400Regular',
+    fontFamily: 'Inter_500Medium',
     fontSize: 12,
-    color: Colors.textSecondary,
+    color: Colors.textMuted,
     marginTop: 2,
   },
   statDivider: {
     width: 1,
-    height: 32,
-    backgroundColor: Colors.border,
+    height: 24,
+    backgroundColor: Colors.borderLight,
   },
-  menuSection: {
-    marginBottom: 24,
+  menuGroup: {
+    gap: 12,
   },
-  menuSectionTitle: {
+  groupTitle: {
     fontFamily: 'Inter_600SemiBold',
     fontSize: 14,
-    color: Colors.textMuted,
-    marginBottom: 8,
-    textTransform: 'uppercase' as const,
+    color: Colors.textSecondary,
+    marginLeft: 4,
+    textTransform: 'uppercase',
     letterSpacing: 0.5,
+  },
+  menuList: {
+    borderRadius: 20,
+    padding: 4,
+    backgroundColor: 'rgba(255,255,255,0.6)',
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.surface,
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 8,
-    gap: 12,
+    padding: 16,
+    gap: 16,
   },
   menuIconWrap: {
-    width: 38,
-    height: 38,
-    borderRadius: 10,
+    width: 40,
+    height: 40,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -209,15 +339,20 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   menuLabel: {
-    fontFamily: 'Inter_500Medium',
+    fontFamily: 'Inter_600SemiBold',
     fontSize: 15,
     color: Colors.text,
   },
   menuSub: {
-    fontFamily: 'Inter_400Regular',
+    fontFamily: 'Inter_500Medium',
     fontSize: 12,
-    color: Colors.textSecondary,
-    marginTop: 1,
+    color: Colors.textMuted,
+    marginTop: 2,
+  },
+  menuDivider: {
+    marginLeft: 72,
+    height: 1,
+    backgroundColor: Colors.borderLight,
   },
   logoutBtn: {
     flexDirection: 'row',
@@ -225,9 +360,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     paddingVertical: 16,
-    backgroundColor: Colors.dangerBg,
-    borderRadius: 14,
-    marginBottom: 16,
+    marginTop: 10,
+    marginBottom: 10,
   },
   logoutText: {
     fontFamily: 'Inter_600SemiBold',
@@ -235,10 +369,10 @@ const styles = StyleSheet.create({
     color: Colors.danger,
   },
   version: {
-    fontFamily: 'Inter_400Regular',
+    textAlign: 'center',
+    fontFamily: 'Inter_500Medium',
     fontSize: 12,
     color: Colors.textMuted,
-    textAlign: 'center',
     marginBottom: 20,
-  },
+  }
 });

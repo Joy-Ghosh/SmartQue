@@ -3,9 +3,12 @@ import {
   StyleSheet,
   Text,
   View,
+  ScrollView,
   Pressable,
   Platform,
   Alert,
+  Dimensions,
+  StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -19,12 +22,17 @@ import Animated, {
   withRepeat,
   withSequence,
   Easing,
+  ZoomIn,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
+import { LinearGradient } from 'expo-linear-gradient';
 import Colors from '@/constants/colors';
 import { useQueue } from '@/lib/queue-context';
+import { GlassView } from '@/components/ui/GlassView';
+import { GradientButton } from '@/components/ui/GradientButton';
 
-type QueueState = 'relax' | 'alert' | 'arrived';
+type QueueState = 'relax' | 'alert' | 'arrived' | 'emergency';
+const { width } = Dimensions.get('window');
 
 export default function ActiveTokenScreen() {
   const insets = useSafeAreaInsets();
@@ -34,8 +42,6 @@ export default function ActiveTokenScreen() {
   const progressWidth = useSharedValue(0);
   const pulseScale = useSharedValue(1);
 
-  const webTopInset = Platform.OS === 'web' ? 67 : 0;
-
   const calculations = useMemo(() => {
     if (!activeBooking) return null;
     const peopleBefore = activeBooking.tokenNumber - activeBooking.servingToken;
@@ -44,7 +50,8 @@ export default function ActiveTokenScreen() {
     const progress = peopleBefore <= 0 ? 1 : Math.min(1, 1 - peopleBefore / (activeBooking.tokenNumber));
 
     let state: QueueState = 'relax';
-    if (timeToLeave <= 0) state = 'arrived';
+    if (activeBooking.isEmergency) state = 'emergency';
+    else if (timeToLeave <= 0) state = 'arrived';
     else if (timeToLeave <= 15) state = 'alert';
 
     return { peopleBefore, totalWait, timeToLeave, progress, state };
@@ -57,12 +64,9 @@ export default function ActiveTokenScreen() {
   }, [calculations?.progress]);
 
   useEffect(() => {
-    if (calculations?.state === 'alert') {
+    if (calculations?.state === 'alert' || calculations?.state === 'emergency') {
       pulseScale.value = withRepeat(
-        withSequence(
-          withTiming(1.05, { duration: 600 }),
-          withTiming(1, { duration: 600 }),
-        ),
+        withSequence(withTiming(1.05, { duration: 600 }), withTiming(1, { duration: 600 })),
         -1,
         true,
       );
@@ -71,217 +75,186 @@ export default function ActiveTokenScreen() {
     }
   }, [calculations?.state]);
 
+  // Simulate Queue Movement
   useEffect(() => {
     if (!activeBooking) return;
-
     const interval = setInterval(() => {
       updateServingToken(activeBooking.servingToken + 1);
-      if (Platform.OS !== 'web') {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      }
+      if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }, 5000);
-
     return () => clearInterval(interval);
   }, [activeBooking?.servingToken]);
 
-  const progressBarStyle = useAnimatedStyle(() => ({
-    width: `${progressWidth.value * 100}%` as any,
-  }));
-
-  const cardPulseStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: pulseScale.value }],
-  }));
+  const progressBarStyle = useAnimatedStyle(() => ({ width: `${progressWidth.value * 100}%` as any }));
+  const cardPulseStyle = useAnimatedStyle(() => ({ transform: [{ scale: pulseScale.value }] }));
 
   const handleCancel = useCallback(() => {
-    Alert.alert(
-      'Cancel Queue',
-      'Are you sure you want to leave the queue?',
-      [
-        { text: 'Stay', style: 'cancel' },
-        {
-          text: 'Leave Queue',
-          style: 'destructive',
-          onPress: () => {
-            cancelBooking();
-            router.back();
-          },
-        },
-      ],
-    );
+    Alert.alert('Cancel Queue', 'Are you sure you want to leave the queue?', [
+      { text: 'Stay', style: 'cancel' },
+      { text: 'Leave Queue', style: 'destructive', onPress: () => { cancelBooking(); router.back(); } },
+    ]);
   }, [cancelBooking]);
 
   const handleSnooze = useCallback(() => {
     snoozeBooking();
-    if (Platform.OS !== 'web') {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-    }
+    if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
   }, [snoozeBooking]);
 
   if (!activeBooking || !calculations) {
     return (
-      <View style={[styles.container, styles.emptyContainer, { paddingTop: insets.top + webTopInset }]}>
-        <View style={styles.emptyIconWrap}>
-          <Ionicons name="ticket-outline" size={48} color={Colors.textMuted} />
+      <View style={[styles.container, styles.centerContent]}>
+        <View style={styles.emptyState}>
+          <Ionicons name="ticket-outline" size={64} color={Colors.textMuted} />
+          <Text style={styles.emptyTitle}>No Active Queue</Text>
+          <Text style={styles.emptySub}>Join a clinic queue to see your token status.</Text>
+          <GradientButton title="Find Clinics" onPress={() => router.back()} style={{ marginTop: 20 }} />
         </View>
-        <Text style={styles.emptyTitle}>No Active Queue</Text>
-        <Text style={styles.emptySub}>Join a clinic queue to see your token status</Text>
-        <Pressable style={styles.emptyBtn} onPress={() => router.back()}>
-          <Text style={styles.emptyBtnText}>Find Clinics</Text>
-        </Pressable>
       </View>
-    );
+    )
   }
 
   const stateColors = {
-    relax: { bg: Colors.infoBg, accent: Colors.info, text: '#1E40AF' },
-    alert: { bg: Colors.alertBg, accent: Colors.alert, text: '#9A3412' },
-    arrived: { bg: Colors.successBg, accent: Colors.success, text: '#065F46' },
+    relax: { bg: ['#E0F2FE', '#F8FAFC'], accent: Colors.primary, text: Colors.primary },
+    alert: { bg: ['#FFF7ED', '#FFF'], accent: Colors.smartAmber, text: '#9A3412' },
+    arrived: { bg: ['#ECFDF5', '#FFF'], accent: Colors.confidenceGreen, text: '#065F46' },
+    emergency: { bg: ['#FEF2F2', '#FFF'], accent: Colors.medicalRed, text: Colors.medicalRed },
   };
 
   const currentState = stateColors[calculations.state];
   const stateMessages = {
-    relax: { title: 'Relax at home', sub: 'You have plenty of time before your turn' },
-    alert: { title: 'Leave Now!', sub: `Start ${activeBooking.transportMode === 'car' ? 'driving' : activeBooking.transportMode === 'bike' ? 'riding' : 'walking'} to reach on time` },
-    arrived: { title: 'Almost There!', sub: 'Your turn is coming up very soon' },
+    relax: { title: 'Relax at home', sub: 'You have wait time available.' },
+    alert: { title: 'Leave Now!', sub: `Start moving to reach on time.` },
+    arrived: { title: 'Almost There!', sub: 'Your turn is coming up very soon.' },
+    emergency: { title: 'Emergency Priority', sub: 'Priority queue active. Proceed immediately.' },
   };
-
   const msg = stateMessages[calculations.state];
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top + webTopInset }]}>
-      <View style={styles.topBar}>
-        <Pressable style={styles.backBtn} onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={22} color={Colors.text} />
+    <View style={styles.container}>
+      <StatusBar barStyle="dark-content" />
+      <LinearGradient colors={currentState.bg} style={StyleSheet.absoluteFill} />
+
+      {/* Header */}
+      <View style={[styles.header, { paddingTop: insets.top }]}>
+        <Pressable onPress={() => router.back()} style={styles.iconBtn}>
+          <Ionicons name="arrow-back" size={24} color={Colors.text} />
         </Pressable>
-        <Text style={styles.topTitle}>Queue Status</Text>
-        <View style={styles.backBtn}>
-          <Ionicons name="notifications-outline" size={22} color={Colors.text} />
-        </View>
+        <Text style={styles.headerTitle}>Live Queue</Text>
+        <Pressable style={styles.iconBtn}>
+          <Ionicons name="share-outline" size={24} color={Colors.text} />
+        </Pressable>
       </View>
 
-      <View style={[styles.statusBanner, { backgroundColor: currentState.bg }]}>
-        <Animated.View style={cardPulseStyle}>
-          <View style={styles.statusBannerContent}>
-            <Ionicons
-              name={
-                calculations.state === 'relax' ? 'cafe' :
-                calculations.state === 'alert' ? 'warning' : 'checkmark-circle'
-              }
-              size={20}
-              color={currentState.accent}
-            />
-            <View>
-              <Text style={[styles.statusBannerTitle, { color: currentState.text }]}>{msg.title}</Text>
-              <Text style={[styles.statusBannerSub, { color: currentState.accent }]}>{msg.sub}</Text>
-            </View>
-          </View>
-        </Animated.View>
-      </View>
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
 
-      <View style={styles.content}>
-        <Animated.View entering={FadeInDown.duration(400)} style={styles.tokenCard}>
-          <View style={styles.tokenCardInner}>
-            <Text style={styles.tokenLabel}>Your Token</Text>
-            <Text style={styles.tokenNumber}>#{activeBooking.tokenNumber}</Text>
-            <View style={styles.tokenDivider} />
-            <Text style={styles.servingLabel}>Currently Serving</Text>
-            <Text style={styles.servingNumber}>#{activeBooking.servingToken}</Text>
+        {/* Status Banner */}
+        <GlassView style={styles.statusBanner} intensity={60} gradientColors={['rgba(255,255,255,0.7)', 'rgba(255,255,255,0.4)']}>
+          <View style={[styles.statusIcon, { backgroundColor: currentState.accent }]}>
+            <Ionicons name={calculations.state === 'alert' ? "alert-outline" : "hourglass-outline"} size={24} color="#fff" />
           </View>
-
-          <View style={styles.progressSection}>
-            <View style={styles.progressLabelRow}>
-              <Text style={styles.progressLabel}>Queue Progress</Text>
-              <Text style={styles.progressPercent}>{Math.round(calculations.progress * 100)}%</Text>
-            </View>
-            <View style={styles.progressTrack}>
-              <Animated.View style={[styles.progressBar, { backgroundColor: currentState.accent }, progressBarStyle]} />
-            </View>
-            <Text style={styles.progressSub}>
-              {calculations.peopleBefore > 0
-                ? `${calculations.peopleBefore} people ahead of you`
-                : "It's your turn!"
-              }
-            </Text>
-          </View>
-        </Animated.View>
-
-        <Animated.View entering={FadeInDown.delay(100).duration(400)} style={styles.infoGrid}>
-          <View style={styles.infoCard}>
-            <Ionicons name="time-outline" size={20} color={Colors.primary} />
-            <Text style={styles.infoValue}>~{Math.max(0, calculations.totalWait)} min</Text>
-            <Text style={styles.infoLabel}>Total Wait</Text>
-          </View>
-          <View style={styles.infoCard}>
-            <Ionicons name={
-              activeBooking.transportMode === 'car' ? 'car-sport' :
-              activeBooking.transportMode === 'bike' ? 'bicycle' : 'walk'
-            } size={20} color={Colors.primary} />
-            <Text style={styles.infoValue}>{activeBooking.travelTime} min</Text>
-            <Text style={styles.infoLabel}>Travel Time</Text>
-          </View>
-          <View style={styles.infoCard}>
-            <Ionicons name="hourglass-outline" size={20} color={
-              calculations.timeToLeave <= 0 ? Colors.danger :
-              calculations.timeToLeave <= 15 ? Colors.alert : Colors.info
-            } />
-            <Text style={[styles.infoValue, {
-              color: calculations.timeToLeave <= 0 ? Colors.danger :
-              calculations.timeToLeave <= 15 ? Colors.alert : Colors.text
-            }]}>
-              {calculations.timeToLeave <= 0 ? 'Now!' : `${calculations.timeToLeave} min`}
-            </Text>
-            <Text style={styles.infoLabel}>Leave In</Text>
-          </View>
-        </Animated.View>
-
-        <Animated.View entering={FadeInDown.delay(150).duration(400)} style={styles.clinicInfoRow}>
-          <Ionicons name="medical" size={18} color={Colors.primary} />
           <View style={{ flex: 1 }}>
-            <Text style={styles.clinicInfoName}>{activeBooking.clinicName}</Text>
-            <Text style={styles.clinicInfoDoc}>{activeBooking.doctorName}</Text>
+            <Text style={[styles.statusTitle, { color: currentState.text }]}>{msg.title}</Text>
+            <Text style={styles.statusSub}>{msg.sub}</Text>
           </View>
-          {activeBooking.isEmergency && (
-            <View style={styles.emergencyBadge}>
-              <Ionicons name="alert-circle" size={14} color="#fff" />
-              <Text style={styles.emergencyBadgeText}>Priority</Text>
+        </GlassView>
+
+        {/* Main Token Circle */}
+        <Animated.View style={[styles.tokenSection, cardPulseStyle]}>
+          <View style={[styles.pulseRing, { borderColor: currentState.accent }]} />
+          <View style={[styles.pulseRing, { borderColor: currentState.accent, opacity: 0.1, transform: [{ scale: 1.2 }] }]} />
+
+          <View style={styles.tokenCircle}>
+            <LinearGradient colors={['#fff', '#F1F5F9']} style={StyleSheet.absoluteFill} />
+            <Text style={styles.tokenLabel}>YOUR TOKEN</Text>
+            <Text style={[styles.tokenValue, { color: currentState.accent }]}>{activeBooking.tokenNumber}</Text>
+            <View style={[styles.servingBadge, { backgroundColor: currentState.accent }]}>
+              <Text style={styles.servingText}>Serving #{activeBooking.servingToken}</Text>
             </View>
-          )}
+          </View>
         </Animated.View>
 
-        <Animated.View entering={FadeInDown.delay(200).duration(400)} style={styles.actionsRow}>
+        {/* Progress Bar */}
+        <View style={styles.progressSection}>
+          <View style={styles.progressRow}>
+            <Text style={styles.progressLabel}>Progress</Text>
+            <Text style={styles.progressVal}>{Math.round(calculations.progress * 100)}%</Text>
+          </View>
+          <View style={styles.track}>
+            <Animated.View style={[styles.bar, { backgroundColor: currentState.accent }, progressBarStyle]} />
+          </View>
+          <Text style={styles.aheadText}>
+            <Text style={{ fontFamily: 'Inter_700Bold' }}>{calculations.peopleBefore}</Text> people ahead of you
+          </Text>
+        </View>
+
+        {/* Metrics */}
+        <GlassView style={styles.metricsGrid} intensity={40} border>
+          <View style={styles.metricItem}>
+            <Text style={styles.metricVal}>{Math.max(0, calculations.totalWait)}<Text style={styles.metricUnit}>m</Text></Text>
+            <Text style={styles.metricLabel}>Est. Wait</Text>
+          </View>
+          <View style={styles.metricDivider} />
+          <View style={styles.metricItem}>
+            <Text style={[styles.metricVal, { color: calculations.timeToLeave <= 0 ? Colors.danger : Colors.text }]}>
+              {calculations.timeToLeave <= 0 ? 'Now' : calculations.timeToLeave}<Text style={styles.metricUnit}>{calculations.timeToLeave <= 0 ? '' : 'm'}</Text>
+            </Text>
+            <Text style={styles.metricLabel}>Leave In</Text>
+          </View>
+          <View style={styles.metricDivider} />
+          <View style={styles.metricItem}>
+            <Text style={styles.metricVal}>{activeBooking.travelTime}<Text style={styles.metricUnit}>m</Text></Text>
+            <Text style={styles.metricLabel}>Travel</Text>
+          </View>
+        </GlassView>
+
+        {/* Clinic Info */}
+        <GlassView style={styles.clinicCard} intensity={50} border>
+          <View style={styles.clinicIcon}>
+            <Ionicons name="medical" size={24} color={Colors.primary} />
+          </View>
+          <View>
+            <Text style={styles.clinicName}>{activeBooking.clinicName}</Text>
+            <Text style={styles.doctorName}>{activeBooking.doctorName}</Text>
+          </View>
+        </GlassView>
+
+        {/* Actions */}
+        <View style={styles.actions}>
           {!isOnMyWay ? (
-            <Pressable
-              style={[styles.actionBtn, styles.primaryBtn]}
-              onPress={() => {
-                setIsOnMyWay(true);
-                if (Platform.OS !== 'web') {
-                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                }
-              }}
-            >
-              <Ionicons name="navigate" size={18} color="#fff" />
-              <Text style={styles.primaryBtnText}>I'm on my way</Text>
-            </Pressable>
+            <GradientButton
+              title="I'm on my way"
+              icon="navigate"
+              onPress={() => setIsOnMyWay(true)}
+              variant="primary"
+            />
           ) : (
-            <View style={[styles.actionBtn, styles.onWayBtn]}>
-              <Ionicons name="checkmark-circle" size={18} color={Colors.success} />
-              <Text style={styles.onWayBtnText}>On the way</Text>
-            </View>
+            <GradientButton
+              title="On the way"
+              icon="checkmark-circle"
+              onPress={() => { }}
+              variant="secondary"
+              disabled
+            />
           )}
-          <Pressable
-            style={[styles.actionBtn, styles.secondaryBtn]}
-            onPress={handleSnooze}
-          >
-            <Ionicons name="time" size={18} color={Colors.primary} />
-            <Text style={styles.secondaryBtnText}>Snooze (+2)</Text>
-          </Pressable>
-        </Animated.View>
 
-        <Pressable style={styles.cancelBtn} onPress={handleCancel}>
-          <Ionicons name="close-circle-outline" size={18} color={Colors.danger} />
-          <Text style={styles.cancelBtnText}>Cancel Queue</Text>
-        </Pressable>
-      </View>
+          <View style={styles.secondaryActions}>
+            <GradientButton
+              title="Snooze"
+              icon="time-outline"
+              onPress={handleSnooze}
+              variant="outline"
+              style={{ flex: 1 }}
+            />
+            <GradientButton
+              title="Cancel"
+              icon="close-circle-outline"
+              onPress={handleCancel}
+              variant="danger" // Will map to a red gradient if I add it, or default
+              style={{ flex: 1 }}
+            />
+          </View>
+        </View>
+      </ScrollView>
     </View>
   );
 }
@@ -291,277 +264,224 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.background,
   },
-  emptyContainer: {
-    alignItems: 'center',
+  centerContent: {
     justifyContent: 'center',
-    paddingHorizontal: 40,
-  },
-  emptyIconWrap: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: Colors.borderLight,
     alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
   },
-  emptyTitle: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 20,
-    color: Colors.text,
-    marginBottom: 8,
-  },
-  emptySub: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 14,
-    color: Colors.textSecondary,
-    textAlign: 'center',
-  },
-  emptyBtn: {
-    backgroundColor: Colors.primary,
-    paddingHorizontal: 28,
-    paddingVertical: 14,
-    borderRadius: 14,
-    marginTop: 20,
-  },
-  emptyBtnText: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 15,
-    color: '#fff',
-  },
-  topBar: {
+  header: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
+    alignItems: 'center',
+    paddingHorizontal: 20,
     paddingVertical: 10,
   },
-  backBtn: {
+  headerTitle: {
+    fontSize: 18,
+    fontFamily: 'Inter_600SemiBold',
+    color: Colors.text,
+  },
+  iconBtn: {
     width: 40,
     height: 40,
-    borderRadius: 12,
-    backgroundColor: Colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.5)',
   },
-  topTitle: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 17,
-    color: Colors.text,
+  scrollContent: {
+    paddingHorizontal: 24,
+    paddingTop: 20,
+    paddingBottom: 40,
   },
   statusBanner: {
-    marginHorizontal: 20,
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 16,
-  },
-  statusBannerContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-  },
-  statusBannerTitle: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 16,
-  },
-  statusBannerSub: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 12,
-    marginTop: 2,
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: 20,
-  },
-  tokenCard: {
-    backgroundColor: Colors.surface,
+    padding: 16,
     borderRadius: 20,
-    padding: 24,
-    marginBottom: 16,
-    shadowColor: Colors.cardShadow,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 1,
-    shadowRadius: 16,
-    elevation: 4,
+    gap: 16,
+    marginBottom: 32,
   },
-  tokenCardInner: {
+  statusIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     alignItems: 'center',
-    marginBottom: 20,
+    justifyContent: 'center',
+  },
+  statusTitle: {
+    fontSize: 16,
+    fontFamily: 'Inter_700Bold',
+    marginBottom: 2,
+  },
+  statusSub: {
+    fontSize: 13,
+    fontFamily: 'Inter_500Medium',
+    color: Colors.textSecondary,
+    lineHeight: 18,
+  },
+  tokenSection: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 40,
+    height: 250,
+  },
+  tokenCircle: {
+    width: 220,
+    height: 220,
+    borderRadius: 110,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Colors.shadows.lg,
+    backgroundColor: '#fff',
+    zIndex: 10,
+  },
+  pulseRing: {
+    position: 'absolute',
+    width: 220,
+    height: 220,
+    borderRadius: 110,
+    borderWidth: 2,
+    opacity: 0.3,
   },
   tokenLabel: {
-    fontFamily: 'Inter_500Medium',
-    fontSize: 13,
-    color: Colors.textSecondary,
-    textTransform: 'uppercase' as const,
-    letterSpacing: 1,
-  },
-  tokenNumber: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 56,
-    color: Colors.primary,
-    lineHeight: 64,
-  },
-  tokenDivider: {
-    width: 40,
-    height: 2,
-    backgroundColor: Colors.border,
-    marginVertical: 12,
-    borderRadius: 1,
-  },
-  servingLabel: {
-    fontFamily: 'Inter_400Regular',
     fontSize: 12,
+    fontFamily: 'Inter_600SemiBold',
     color: Colors.textMuted,
+    marginBottom: 4,
+    letterSpacing: 2,
+    textTransform: 'uppercase',
   },
-  servingNumber: {
+  tokenValue: {
+    fontSize: 64,
     fontFamily: 'Inter_700Bold',
-    fontSize: 28,
-    color: Colors.text,
+    lineHeight: 70,
+  },
+  servingBadge: {
+    marginTop: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  servingText: {
+    color: '#fff',
+    fontSize: 12,
+    fontFamily: 'Inter_600SemiBold',
   },
   progressSection: {
-    gap: 6,
+    marginBottom: 24,
   },
-  progressLabelRow: {
+  progressRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    marginBottom: 8,
   },
   progressLabel: {
+    fontSize: 14,
     fontFamily: 'Inter_500Medium',
-    fontSize: 13,
     color: Colors.textSecondary,
   },
-  progressPercent: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 13,
-    color: Colors.primary,
-  },
-  progressTrack: {
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: Colors.borderLight,
-    overflow: 'hidden',
-  },
-  progressBar: {
-    height: '100%',
-    borderRadius: 4,
-  },
-  progressSub: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 12,
-    color: Colors.textMuted,
-  },
-  infoGrid: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 16,
-  },
-  infoCard: {
-    flex: 1,
-    backgroundColor: Colors.surface,
-    borderRadius: 14,
-    padding: 14,
-    alignItems: 'center',
-    gap: 4,
-  },
-  infoValue: {
+  progressVal: {
+    fontSize: 14,
     fontFamily: 'Inter_700Bold',
-    fontSize: 16,
     color: Colors.text,
   },
-  infoLabel: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 11,
-    color: Colors.textSecondary,
+  track: {
+    height: 10,
+    backgroundColor: 'rgba(0,0,0,0.05)',
+    borderRadius: 5,
+    overflow: 'hidden',
+    marginBottom: 8,
   },
-  clinicInfoRow: {
+  bar: {
+    height: '100%',
+    borderRadius: 5,
+  },
+  aheadText: {
+    textAlign: 'center',
+    fontSize: 13,
+    color: Colors.textSecondary,
+    fontFamily: 'Inter_500Medium',
+  },
+  metricsGrid: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    backgroundColor: Colors.surface,
-    borderRadius: 14,
-    padding: 14,
+    padding: 20,
+    borderRadius: 20,
     marginBottom: 20,
   },
-  clinicInfoName: {
+  metricItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  metricVal: {
+    fontSize: 20,
+    fontFamily: 'Inter_700Bold',
+    color: Colors.text,
+    marginBottom: 2,
+  },
+  metricUnit: {
+    fontSize: 12,
+    fontFamily: 'Inter_500Medium',
+    color: Colors.textMuted,
+  },
+  metricLabel: {
+    fontSize: 12,
+    fontFamily: 'Inter_500Medium',
+    color: Colors.textMuted,
+    textTransform: 'uppercase',
+  },
+  metricDivider: {
+    width: 1,
+    height: 30,
+    backgroundColor: Colors.borderLight,
+  },
+  clinicCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 20,
+    gap: 16,
+    marginBottom: 32,
+  },
+  clinicIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    backgroundColor: Colors.primaryBg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  clinicName: {
+    fontSize: 16,
     fontFamily: 'Inter_600SemiBold',
-    fontSize: 14,
     color: Colors.text,
   },
-  clinicInfoDoc: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 12,
+  doctorName: {
+    fontSize: 14,
+    fontFamily: 'Inter_500Medium',
     color: Colors.textSecondary,
-    marginTop: 2,
   },
-  emergencyBadge: {
+  actions: {
+    gap: 12,
+  },
+  secondaryActions: {
     flexDirection: 'row',
+    gap: 12,
+  },
+  emptyState: {
     alignItems: 'center',
-    gap: 4,
-    backgroundColor: Colors.danger,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 10,
+    gap: 12,
   },
-  emergencyBadgeText: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 11,
-    color: '#fff',
+  emptyTitle: {
+    fontSize: 20,
+    fontFamily: 'Inter_700Bold',
+    color: Colors.text,
   },
-  actionsRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 12,
-  },
-  actionBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 14,
-    borderRadius: 14,
-  },
-  primaryBtn: {
-    backgroundColor: Colors.primary,
-  },
-  primaryBtnText: {
-    fontFamily: 'Inter_600SemiBold',
+  emptySub: {
     fontSize: 14,
-    color: '#fff',
-  },
-  onWayBtn: {
-    backgroundColor: Colors.successBg,
-    borderWidth: 1,
-    borderColor: Colors.success,
-  },
-  onWayBtnText: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 14,
-    color: Colors.success,
-  },
-  secondaryBtn: {
-    backgroundColor: Colors.primaryBg,
-    borderWidth: 1,
-    borderColor: Colors.primary + '30',
-  },
-  secondaryBtnText: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 14,
-    color: Colors.primary,
-  },
-  cancelBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 14,
-    borderRadius: 14,
-    backgroundColor: Colors.dangerBg,
-  },
-  cancelBtnText: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 14,
-    color: Colors.danger,
+    fontFamily: 'Inter_500Medium',
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    maxWidth: 250,
   },
 });

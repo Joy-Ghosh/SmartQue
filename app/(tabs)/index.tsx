@@ -1,486 +1,647 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import {
-  StyleSheet,
-  Text,
-  View,
-  ScrollView,
-  TextInput,
-  Pressable,
-  Platform,
+    StyleSheet,
+    Text,
+    View,
+    ScrollView,
+    Pressable,
+    Image,
+    Dimensions,
+    TextInput,
+    StatusBar,
+    Platform
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { Link, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
+import { LinearGradient } from 'expo-linear-gradient';
 import Colors from '@/constants/colors';
-import { clinics, categories, user, getClinicDoctor, getQueueBadge } from '@/lib/data';
 import { useQueue } from '@/lib/queue-context';
+import { Layout } from '@/constants/layout';
+import { GlassView } from '@/components/ui/GlassView';
+import { StatusBadge } from '@/components/ui/StatusBadge';
+import { GradientButton } from '@/components/ui/GradientButton';
+import { QueueVisualizer } from '@/components/ui/QueueVisualizer';
 
-function ClinicCard({ clinic, index }: { clinic: typeof clinics[0]; index: number }) {
-  const doctor = getClinicDoctor(clinic.id);
-  const badge = getQueueBadge(clinic.currentQueueLength);
-  const totalWait = clinic.currentQueueLength * clinic.avgWaitTimePerPatient;
+const { width } = Dimensions.get('window');
 
-  const iconMap: Record<string, keyof typeof Ionicons.glyphMap> = {
-    tooth: 'medical',
-    medkit: 'medkit',
-    body: 'body',
-    eye: 'eye',
-    flask: 'flask',
-  };
+// Data for Category Grid with new brand colors
+const CATEGORIES = [
+    { id: 'all', name: 'All', icon: 'grid', color: '#F8FAFC', iconColor: '#64748B' },
+    { id: 'general', name: 'General', icon: 'medkit', color: '#EFF6FF', iconColor: '#3B82F6' },
+    { id: 'dental', name: 'Dental', icon: 'medical', color: '#F0FDFA', iconColor: '#14B8A6' },
+    { id: 'dermatology', name: 'Skin', icon: 'happy', color: '#FFF7ED', iconColor: '#F97316' },
+    { id: 'cardiology', name: 'Cardio', icon: 'heart', color: '#FEF2F2', iconColor: '#EF4444' },
+    { id: 'pediatrics', name: 'Pediatric', icon: 'people', color: '#ECFDF5', iconColor: '#10B981' },
+    { id: 'lab', name: 'Lab Tests', icon: 'flask', color: '#F3E8FF', iconColor: '#A855F7' },
+    { id: 'orthopedics', name: 'Orthopedic', icon: 'fitness', color: '#F0FDF4', iconColor: '#166534' },
+];
 
-  return (
-    <Animated.View entering={FadeInDown.delay(index * 80).duration(400)}>
-      <Pressable
-        style={({ pressed }) => [styles.clinicCard, pressed && { transform: [{ scale: 0.98 }], opacity: 0.9 }]}
-        onPress={() => router.push({ pathname: '/clinic/[id]', params: { id: clinic.id } })}
-      >
-        <View style={styles.clinicCardHeader}>
-          <View style={[styles.clinicIconWrap, { backgroundColor: Colors.primaryBg }]}>
-            <Ionicons name={iconMap[clinic.image] || 'medkit'} size={24} color={Colors.primary} />
-          </View>
-          <View style={styles.clinicInfo}>
-            <Text style={styles.clinicName}>{clinic.name}</Text>
-            {doctor && <Text style={styles.doctorName}>{doctor.name}</Text>}
-          </View>
-          <View style={[styles.badge, { backgroundColor: badge.bgColor }]}>
-            <View style={[styles.badgeDot, { backgroundColor: badge.color }]} />
-            <Text style={[styles.badgeText, { color: badge.color }]}>{badge.label}</Text>
-          </View>
-        </View>
-        <View style={styles.clinicCardFooter}>
-          <View style={styles.statItem}>
-            <Ionicons name="location-outline" size={14} color={Colors.textSecondary} />
-            <Text style={styles.statText}>{clinic.distance}km away</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Ionicons name="people-outline" size={14} color={Colors.textSecondary} />
-            <Text style={styles.statText}>{clinic.currentQueueLength} in queue</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Ionicons name="time-outline" size={14} color={Colors.textSecondary} />
-            <Text style={styles.statText}>~{totalWait} min</Text>
-          </View>
-        </View>
-        {doctor && (
-          <View style={styles.clinicCardBottom}>
-            <View style={styles.ratingWrap}>
-              <Ionicons name="star" size={13} color="#F59E0B" />
-              <Text style={styles.ratingText}>{clinic.rating}</Text>
-            </View>
-            <Text style={styles.feeText}>{'\u20B9'}{doctor.fee}/visit</Text>
-          </View>
-        )}
-      </Pressable>
-    </Animated.View>
-  );
-}
+// Data for Nearby Clinics
+const CLINICS = [
+    {
+        id: '1',
+        name: 'Jay Dental Clinic',
+        doctor: 'Dr. John Doe',
+        specialty: 'Dentist',
+        rating: 4.8,
+        distance: '1.2 km',
+        waitTimeMin: 10,
+        services: ['dental', 'general'],
+        image: 'https://images.unsplash.com/photo-1629909613654-28e377c37b09?w=800&auto=format&fit=crop&q=60',
+    },
+    {
+        id: '2',
+        name: 'City Health Center',
+        doctor: 'Dr. Sarah Smith',
+        specialty: 'General',
+        rating: 4.5,
+        distance: '2.5 km',
+        waitTimeMin: 45,
+        services: ['general'],
+        image: 'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?w=800&auto=format&fit=crop&q=60',
+    },
+    {
+        id: '3',
+        name: 'Life Care Polyclinic',
+        doctor: 'Dr. Michael Brown',
+        specialty: 'Skin',
+        rating: 4.2,
+        distance: '3.8 km',
+        waitTimeMin: 75,
+        services: ['dermatology', 'general'],
+        image: 'https://images.unsplash.com/photo-1538108149393-fbbd81895907?w=800&auto=format&fit=crop&q=60',
+    },
+];
 
 export default function HomeScreen() {
-  const insets = useSafeAreaInsets();
-  const [search, setSearch] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('all');
-  const { activeBooking } = useQueue();
+    const insets = useSafeAreaInsets();
+    const { activeBooking } = useQueue();
+    const [selectedLocation, setSelectedLocation] = useState('New York');
+    const [selectedCategory, setSelectedCategory] = useState('all');
 
-  const filteredClinics = useMemo(() => {
-    let filtered = clinics;
-    if (selectedCategory !== 'all') {
-      filtered = filtered.filter((c) => c.type === selectedCategory);
-    }
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      filtered = filtered.filter(
-        (c) =>
-          c.name.toLowerCase().includes(q) ||
-          c.type.toLowerCase().includes(q) ||
-          c.address.toLowerCase().includes(q),
-      );
-    }
-    return filtered;
-  }, [selectedCategory, search]);
+    // Filter clinics based on selected category
+    const filteredClinics = selectedCategory === 'all'
+        ? CLINICS
+        : CLINICS.filter(clinic => clinic.services.includes(selectedCategory));
 
-  const greeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return 'Good Morning';
-    if (hour < 17) return 'Good Afternoon';
-    return 'Good Evening';
-  };
+    // Helper for Status Badge Logic
+    const getStatus = (mins: number) => {
+        if (mins < 15) return 'success';
+        if (mins < 60) return 'live'; // or warning/amber
+        return 'alert';
+    };
 
-  const webTopInset = Platform.OS === 'web' ? 67 : 0;
+    const getWaitLabel = (mins: number) => {
+        if (mins < 15) return `<15m`;
+        if (mins < 60) return `~${mins}m`;
+        return `1h+`;
+    };
 
-  return (
-    <View style={[styles.container, { paddingTop: insets.top + webTopInset }]}>
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 100 }]}
-        contentInsetAdjustmentBehavior="automatic"
-      >
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.greeting}>{greeting()},</Text>
-            <Text style={styles.userName}>{user.firstName}</Text>
-          </View>
-          <Pressable style={styles.notifBtn}>
-            <Ionicons name="notifications-outline" size={22} color={Colors.text} />
-          </Pressable>
-        </View>
+    return (
+        <View style={styles.container}>
+            <StatusBar barStyle="dark-content" />
 
-        <View style={styles.locationRow}>
-          <Ionicons name="location" size={16} color={Colors.primary} />
-          <Text style={styles.locationText}>{user.location}</Text>
-          <Ionicons name="chevron-down" size={14} color={Colors.textSecondary} />
-        </View>
-
-        <View style={styles.searchWrap}>
-          <Ionicons name="search" size={18} color={Colors.textMuted} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search for clinics, doctors..."
-            placeholderTextColor={Colors.textMuted}
-            value={search}
-            onChangeText={setSearch}
-          />
-          {search.length > 0 && (
-            <Pressable onPress={() => setSearch('')}>
-              <Ionicons name="close-circle" size={18} color={Colors.textMuted} />
-            </Pressable>
-          )}
-        </View>
-
-        {activeBooking && (
-          <Pressable
-            style={styles.activeBookingBanner}
-            onPress={() => router.push('/active-token')}
-          >
-            <View style={styles.bannerLeft}>
-              <View style={styles.bannerIconWrap}>
-                <Ionicons name="ticket" size={20} color="#fff" />
-              </View>
-              <View>
-                <Text style={styles.bannerTitle}>Active Queue - #{activeBooking.tokenNumber}</Text>
-                <Text style={styles.bannerSub}>
-                  Serving #{activeBooking.servingToken} at {activeBooking.clinicName}
-                </Text>
-              </View>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color="#fff" />
-          </Pressable>
-        )}
-
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.categoriesRow}
-          contentContainerStyle={styles.categoriesContent}
-        >
-          {categories.map((cat) => {
-            const isActive = selectedCategory === cat.id;
-            return (
-              <Pressable
-                key={cat.id}
-                style={[styles.categoryChip, isActive && styles.categoryChipActive]}
-                onPress={() => setSelectedCategory(cat.id)}
-              >
-                <Ionicons
-                  name={cat.icon as any}
-                  size={16}
-                  color={isActive ? '#fff' : Colors.textSecondary}
+            {/* Background Gradient for Top Section */}
+            <View style={styles.topBg}>
+                <LinearGradient
+                    colors={['#E0F2FE', '#F8FAFC']}
+                    style={StyleSheet.absoluteFill}
+                    start={{ x: 0.5, y: 0 }}
+                    end={{ x: 0.5, y: 1 }}
                 />
-                <Text style={[styles.categoryLabel, isActive && styles.categoryLabelActive]}>
-                  {cat.label}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
+                {/* Decorative Circle 1 */}
+                <View style={[styles.decorativeCircle, { top: -50, right: -50, backgroundColor: 'rgba(31, 182, 166, 0.1)' }]} />
+                {/* Decorative Circle 2 */}
+                <View style={[styles.decorativeCircle, { top: 100, left: -80, width: 200, height: 200, backgroundColor: 'rgba(30, 42, 94, 0.05)' }]} />
+            </View>
 
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Nearby Clinics</Text>
-          <Text style={styles.sectionCount}>{filteredClinics.length} found</Text>
+            <ScrollView
+                contentContainerStyle={[
+                    styles.scrollContent,
+                    { paddingTop: insets.top + 10, paddingBottom: 100 },
+                ]}
+                showsVerticalScrollIndicator={false}
+            >
+                {/* 1. Top Bar */}
+                <Animated.View entering={FadeInDown.duration(600).delay(100)} style={styles.topBar}>
+                    <Pressable style={styles.locationBtn}>
+                        <View style={styles.locationIconBg}>
+                            <Ionicons name="location" size={18} color={Colors.primary} />
+                        </View>
+                        <View>
+                            <Text style={styles.locationLabel}>Current Location</Text>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                <Text style={styles.locationValue}>{selectedLocation}</Text>
+                                <Ionicons name="chevron-down" size={12} color={Colors.textSecondary} />
+                            </View>
+                        </View>
+                    </Pressable>
+
+                    <View style={styles.topRightActions}>
+                        <Pressable style={styles.iconBtn}>
+                            <Ionicons name="notifications-outline" size={22} color={Colors.text} />
+                            <View style={styles.notifBadge} />
+                        </Pressable>
+                        <Pressable onPress={() => router.push('/(tabs)/profile')}>
+                            <Image
+                                source={{ uri: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=800&auto=format&fit=crop&q=60' }}
+                                style={styles.avatar}
+                            />
+                        </Pressable>
+                    </View>
+                </Animated.View>
+
+                {/* 2. Hero Section: Live Token or Welcome */}
+                <Animated.View entering={FadeInDown.duration(600).delay(200)} style={styles.heroSection}>
+                    {activeBooking ? (
+                        <Pressable onPress={() => router.push('/(tabs)/token')}>
+                            <GlassView style={styles.activeCard} gradientColors={Colors.gradients.primary}>
+                                <View style={styles.activeCardHeader}>
+                                    <View>
+                                        <Text style={styles.activeLabel}>Live Token</Text>
+                                        <Text style={styles.activeDoctor}>{activeBooking.doctorName}</Text>
+                                        <Text style={styles.activeClinic}>{activeBooking.clinicName}</Text>
+                                    </View>
+                                    <View style={styles.tokenContainer}>
+                                        <Text style={styles.tokenLabel}>YOU</Text>
+                                        <Text style={styles.tokenNumber}>{activeBooking.tokenNumber}</Text>
+                                    </View>
+                                </View>
+
+                                <View style={styles.visualizerContainer}>
+                                    <QueueVisualizer
+                                        total={activeBooking.tokenNumber + 5}
+                                        serving={activeBooking.servingToken}
+                                        userToken={activeBooking.tokenNumber}
+                                        estimatedWait={Math.max(0, (activeBooking.tokenNumber - activeBooking.servingToken) * activeBooking.avgWaitTime)}
+                                    />
+                                </View>
+
+                                <View style={styles.activeCardFooter}>
+                                    <StatusBadge status="live" text="Tracking Live" />
+                                    <View style={styles.leaveTimeContainer}>
+                                        <Ionicons name="walk-outline" size={14} color="rgba(255,255,255,0.8)" />
+                                        <Text style={styles.leaveTimeText}>Leave by 10:45 AM</Text>
+                                    </View>
+                                </View>
+                            </GlassView>
+                        </Pressable>
+                    ) : (
+                        <GlassView style={styles.heroBanner} gradientColors={['#FFFFFF', '#F1F5F9']}>
+                            <View style={styles.heroContent}>
+                                <Text style={styles.heroTitle}>Skip the <Text style={{ color: Colors.primary }}>waiting room.</Text></Text>
+                                <Text style={styles.heroSub}>Book appointments & track queues in real-time.</Text>
+                                <GradientButton
+                                    title="Find a Clinic"
+                                    onPress={() => { }}
+                                    style={{ alignSelf: 'flex-start', marginTop: 10 }}
+                                    icon="search"
+                                />
+                            </View>
+                            <Image
+                                source={{ uri: 'https://cdn-icons-png.flaticon.com/512/3063/3063822.png' }}
+                                style={styles.heroImage}
+                                resizeMode="contain"
+                            />
+                        </GlassView>
+                    )}
+                </Animated.View>
+
+                {/* 3. Search Bar */}
+                <Animated.View entering={FadeInDown.duration(600).delay(300)} style={styles.searchSection}>
+                    <GlassView style={styles.searchBar} intensity={20} border={false}>
+                        <Ionicons name="search" size={20} color={Colors.textMuted} style={{ marginLeft: 4 }} />
+                        <TextInput
+                            placeholder="Doctor, clinic, or specialty..."
+                            placeholderTextColor={Colors.textMuted}
+                            style={styles.searchInput}
+                        />
+                        <View style={styles.filterSeparator} />
+                        <Pressable style={styles.filterBtn}>
+                            <Ionicons name="options-outline" size={20} color={Colors.primary} />
+                        </Pressable>
+                    </GlassView>
+                </Animated.View>
+
+                {/* 4. Categories */}
+                <Animated.View entering={FadeInDown.duration(600).delay(400)} style={styles.sectionHeader}>
+                    <Text style={styles.sectionTitle}>Specialties</Text>
+                </Animated.View>
+
+                <Animated.ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.categoryScroll}
+                    entering={FadeInDown.duration(600).delay(450)}
+                >
+                    {CATEGORIES.map((cat, index) => (
+                        <Pressable
+                            key={cat.id}
+                            style={[
+                                styles.categoryBtn,
+                                { backgroundColor: selectedCategory === cat.id ? Colors.primary : '#fff' },
+                            ]}
+                            onPress={() => setSelectedCategory(cat.id)}
+                        >
+                            <View style={[
+                                styles.catIconWrap,
+                                { backgroundColor: selectedCategory === cat.id ? 'rgba(255,255,255,0.2)' : cat.color }
+                            ]}>
+                                <Ionicons name={cat.icon as any} size={22} color={selectedCategory === cat.id ? '#fff' : cat.iconColor} />
+                            </View>
+                            <Text style={[
+                                styles.categoryLabel,
+                                selectedCategory === cat.id && styles.selectedCategoryLabel
+                            ]}>{cat.name}</Text>
+                        </Pressable>
+                    ))}
+                </Animated.ScrollView>
+
+                {/* 5. Nearest Clinics */}
+                <View style={styles.listSection}>
+                    <View style={styles.sectionHeader}>
+                        <Text style={styles.sectionTitle}>Nearby Clinics</Text>
+                        <Pressable onPress={() => router.push('/clinics')}>
+                            <Text style={styles.seeAll}>See All</Text>
+                        </Pressable>
+                    </View>
+
+                    <View style={styles.clinicsList}>
+                        {filteredClinics.map((clinic, index) => (
+                            <Animated.View
+                                key={clinic.id}
+                                entering={FadeInDown.duration(600).delay(500 + index * 100)}
+                            >
+                                <Link href={`/clinic/${clinic.id}`} asChild>
+                                    <Pressable>
+                                        <GlassView style={styles.clinicCard} border intensity={0} gradientColors={['#fff', '#fff']}>
+                                            <Image source={{ uri: clinic.image }} style={styles.clinicImage} />
+                                            <View style={styles.clinicContent}>
+                                                <View style={styles.clinicHeader}>
+                                                    <View style={{ flex: 1 }}>
+                                                        <Text style={styles.clinicName}>{clinic.name}</Text>
+                                                        <Text style={styles.doctorName}>{clinic.doctor}</Text>
+                                                    </View>
+                                                    <StatusBadge
+                                                        status={getStatus(clinic.waitTimeMin) as any}
+                                                        text={getWaitLabel(clinic.waitTimeMin)}
+                                                    />
+                                                </View>
+
+                                                <View style={styles.clinicDetails}>
+                                                    <Text style={styles.detailText}>{clinic.specialty}</Text>
+                                                    <View style={styles.detailDot} />
+                                                    <Ionicons name="star" size={12} color={Colors.smartAmber} />
+                                                    <Text style={styles.detailText}>{clinic.rating}</Text>
+                                                    <View style={styles.detailDot} />
+                                                    <Text style={styles.detailText}>{clinic.distance}</Text>
+                                                </View>
+                                            </View>
+                                        </GlassView>
+                                    </Pressable>
+                                </Link>
+                            </Animated.View>
+                        ))}
+                    </View>
+                </View>
+            </ScrollView>
         </View>
-
-        {filteredClinics.map((clinic, i) => (
-          <ClinicCard key={clinic.id} clinic={clinic} index={i} />
-        ))}
-
-        {filteredClinics.length === 0 && (
-          <View style={styles.emptyState}>
-            <Ionicons name="search-outline" size={48} color={Colors.textMuted} />
-            <Text style={styles.emptyText}>No clinics found</Text>
-            <Text style={styles.emptySubText}>Try a different search or category</Text>
-          </View>
-        )}
-      </ScrollView>
-    </View>
-  );
+    );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
-  scrollContent: {
-    paddingHorizontal: 20,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 8,
-    marginBottom: 4,
-  },
-  greeting: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 14,
-    color: Colors.textSecondary,
-  },
-  userName: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 24,
-    color: Colors.text,
-    marginTop: 2,
-  },
-  notifBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: Colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: Colors.cardShadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 1,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  locationRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginBottom: 16,
-  },
-  locationText: {
-    fontFamily: 'Inter_500Medium',
-    fontSize: 13,
-    color: Colors.textSecondary,
-  },
-  searchWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.surface,
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    gap: 10,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: Colors.borderLight,
-  },
-  searchInput: {
-    flex: 1,
-    fontFamily: 'Inter_400Regular',
-    fontSize: 15,
-    color: Colors.text,
-    paddingVertical: 0,
-  },
-  activeBookingBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: Colors.primary,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
-  },
-  bannerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    flex: 1,
-  },
-  bannerIconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  bannerTitle: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 15,
-    color: '#fff',
-  },
-  bannerSub: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.8)',
-    marginTop: 2,
-  },
-  categoriesRow: {
-    marginBottom: 20,
-  },
-  categoriesContent: {
-    gap: 8,
-  },
-  categoryChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 24,
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  categoryChipActive: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
-  },
-  categoryLabel: {
-    fontFamily: 'Inter_500Medium',
-    fontSize: 13,
-    color: Colors.textSecondary,
-  },
-  categoryLabelActive: {
-    color: '#fff',
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  sectionTitle: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 18,
-    color: Colors.text,
-  },
-  sectionCount: {
-    fontFamily: 'Inter_500Medium',
-    fontSize: 13,
-    color: Colors.textMuted,
-  },
-  clinicCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: Colors.cardShadow,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius: 12,
-    elevation: 3,
-    borderWidth: 1,
-    borderColor: Colors.borderLight,
-  },
-  clinicCardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: 12,
-  },
-  clinicIconWrap: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  clinicInfo: {
-    flex: 1,
-  },
-  clinicName: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 15,
-    color: Colors.text,
-  },
-  doctorName: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 13,
-    color: Colors.textSecondary,
-    marginTop: 2,
-  },
-  badge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 20,
-  },
-  badgeDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  badgeText: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 11,
-  },
-  clinicCardFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: Colors.borderLight,
-  },
-  statItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    flex: 1,
-  },
-  statText: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 12,
-    color: Colors.textSecondary,
-  },
-  statDivider: {
-    width: 1,
-    height: 16,
-    backgroundColor: Colors.border,
-    marginHorizontal: 4,
-  },
-  clinicCardBottom: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 10,
-  },
-  ratingWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  ratingText: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 13,
-    color: Colors.text,
-  },
-  feeText: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 14,
-    color: Colors.primary,
-  },
-  emptyState: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 60,
-    gap: 8,
-  },
-  emptyText: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 16,
-    color: Colors.textSecondary,
-  },
-  emptySubText: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 13,
-    color: Colors.textMuted,
-  },
+    container: {
+        flex: 1,
+        backgroundColor: Colors.background,
+    },
+    topBg: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        height: 350,
+        backgroundColor: '#E0F2FE',
+    },
+    decorativeCircle: {
+        position: 'absolute',
+        width: 150,
+        height: 150,
+        borderRadius: 75,
+    },
+    scrollContent: {
+        paddingHorizontal: 20,
+    },
+
+    // Top Bar
+    topBar: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 20,
+    },
+    locationBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+    },
+    locationIconBg: {
+        width: 36,
+        height: 36,
+        borderRadius: 12,
+        backgroundColor: '#fff',
+        alignItems: 'center',
+        justifyContent: 'center',
+        ...Colors.shadows.sm,
+    },
+    locationLabel: {
+        fontFamily: 'Inter_500Medium',
+        fontSize: 11,
+        color: Colors.textMuted,
+        textTransform: 'uppercase',
+    },
+    locationValue: {
+        fontFamily: 'Inter_700Bold',
+        fontSize: 15,
+        color: Colors.text,
+    },
+    topRightActions: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+    },
+    iconBtn: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: '#fff',
+        alignItems: 'center',
+        justifyContent: 'center',
+        ...Colors.shadows.sm,
+    },
+    notifBadge: {
+        position: 'absolute',
+        top: 10,
+        right: 10,
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: Colors.medicalRed,
+        borderWidth: 1.5,
+        borderColor: '#fff',
+    },
+    avatar: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        borderWidth: 2,
+        borderColor: '#fff',
+    },
+
+    // Hero Section
+    heroSection: {
+        marginBottom: 24,
+    },
+    heroBanner: {
+        borderRadius: 24,
+        padding: 24,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        minHeight: 160,
+        ...Colors.shadows.md,
+    },
+    heroContent: {
+        flex: 1,
+        paddingRight: 10,
+    },
+    heroTitle: {
+        fontFamily: 'Inter_700Bold',
+        fontSize: 22,
+        color: Colors.text,
+        marginBottom: 8,
+        lineHeight: 30,
+    },
+    heroSub: {
+        fontFamily: 'Inter_500Medium',
+        fontSize: 14,
+        color: Colors.textSecondary,
+        marginBottom: 12,
+        lineHeight: 20,
+    },
+    heroImage: {
+        width: 100,
+        height: 100,
+    },
+
+    // Active Card
+    activeCard: {
+        borderRadius: 24,
+        padding: 20,
+        gap: 20,
+        ...Colors.shadows.glow,
+    },
+    activeCardHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+    },
+    activeLabel: {
+        color: 'rgba(255,255,255,0.7)',
+        fontSize: 12,
+        fontFamily: 'Inter_600SemiBold',
+        marginBottom: 4,
+        textTransform: 'uppercase',
+        letterSpacing: 1,
+    },
+    activeDoctor: {
+        color: '#fff',
+        fontSize: 20,
+        fontFamily: 'Inter_700Bold',
+        marginBottom: 2,
+    },
+    activeClinic: {
+        color: 'rgba(255,255,255,0.8)',
+        fontSize: 14,
+        fontFamily: 'Inter_500Medium',
+    },
+    tokenContainer: {
+        alignItems: 'center',
+        backgroundColor: 'rgba(255,255,255,0.15)',
+        padding: 10,
+        borderRadius: 12,
+        minWidth: 60,
+    },
+    tokenLabel: {
+        color: 'rgba(255,255,255,0.7)',
+        fontSize: 10,
+        fontFamily: 'Inter_700Bold',
+        marginBottom: 0,
+    },
+    tokenNumber: {
+        color: '#fff',
+        fontSize: 24,
+        fontFamily: 'Inter_700Bold',
+    },
+    visualizerContainer: {
+        marginVertical: 4,
+    },
+    activeCardFooter: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingTop: 12,
+        borderTopWidth: 1,
+        borderTopColor: 'rgba(255,255,255,0.2)',
+    },
+    leaveTimeContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    leaveTimeText: {
+        color: '#fff',
+        fontFamily: 'Inter_500Medium',
+        fontSize: 13,
+    },
+
+    // Search
+    searchSection: {
+        marginBottom: 24,
+    },
+    searchBar: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#fff',
+        paddingHorizontal: 16,
+        paddingVertical: 14,
+        borderRadius: 16,
+        ...Colors.shadows.md,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.6)',
+    },
+    searchInput: {
+        flex: 1,
+        marginLeft: 10,
+        fontFamily: 'Inter_500Medium',
+        fontSize: 15,
+        color: Colors.text,
+    },
+    filterSeparator: {
+        width: 1,
+        height: 20,
+        backgroundColor: Colors.borderLight,
+        marginHorizontal: 12,
+    },
+    filterBtn: {
+        padding: 4,
+    },
+
+    // Categories
+    sectionHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    sectionTitle: {
+        fontFamily: 'Inter_700Bold',
+        fontSize: 18,
+        color: Colors.text,
+    },
+    seeAll: {
+        fontFamily: 'Inter_600SemiBold',
+        fontSize: 14,
+        color: Colors.primary,
+    },
+    categoryScroll: {
+        paddingRight: 20,
+        gap: 12,
+        paddingBottom: 24,
+    },
+    categoryBtn: {
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        borderRadius: 16,
+        alignItems: 'center',
+        flexDirection: 'row',
+        gap: 10,
+        ...Colors.shadows.sm,
+    },
+    catIconWrap: {
+        width: 36,
+        height: 36,
+        borderRadius: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    categoryLabel: {
+        fontFamily: 'Inter_600SemiBold',
+        fontSize: 14,
+        color: Colors.text,
+    },
+    selectedCategoryLabel: {
+        color: '#fff',
+    },
+
+    // Nearby List
+    listSection: {
+        marginBottom: 20,
+    },
+    clinicsList: {
+        gap: 16,
+    },
+    clinicCard: {
+        borderRadius: 20,
+        padding: 12,
+        ...Colors.shadows.sm,
+        flexDirection: 'row',
+        backgroundColor: '#fff',
+    },
+    clinicImage: {
+        width: 90,
+        height: 90,
+        borderRadius: 14,
+        backgroundColor: Colors.borderLight,
+    },
+    clinicContent: {
+        flex: 1,
+        marginLeft: 14,
+        justifyContent: 'space-between',
+        paddingVertical: 2,
+    },
+    clinicHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+    },
+    clinicName: {
+        fontFamily: 'Inter_600SemiBold',
+        fontSize: 16,
+        color: Colors.text,
+        marginBottom: 2,
+    },
+    doctorName: {
+        fontFamily: 'Inter_500Medium',
+        fontSize: 13,
+        color: Colors.textSecondary,
+        marginBottom: 8,
+    },
+    clinicDetails: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    detailText: {
+        fontFamily: 'Inter_500Medium',
+        fontSize: 12,
+        color: Colors.textMuted,
+    },
+    detailDot: {
+        width: 3,
+        height: 3,
+        borderRadius: 1.5,
+        backgroundColor: Colors.textMuted,
+        marginHorizontal: 6,
+    },
 });

@@ -1,6 +1,7 @@
 // template
 import { Link, Stack } from "expo-router";
 import { StyleSheet, Text, View } from "react-native";
+import { Layout } from "@/constants/layout";
 
 export default function NotFoundScreen() {
   return (
@@ -22,7 +23,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    padding: 20,
+    padding: Layout.grid.margin, // Use Grid margin
   },
   title: {
     fontSize: 20,

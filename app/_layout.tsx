@@ -1,5 +1,6 @@
 import { QueryClientProvider } from '@tanstack/react-query';
 import { Stack } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import React, { useEffect, useState } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -14,9 +15,11 @@ SplashScreen.preventAutoHideAsync();
 function RootLayoutNav() {
   return (
     <Stack screenOptions={{ headerBackTitle: 'Back' }}>
+      <Stack.Screen name="(onboarding)" options={{ headerShown: false }} />
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="clinic/[id]" options={{ headerShown: false }} />
       <Stack.Screen name="active-token" options={{ headerShown: false }} />
+      <Stack.Screen name="appointments" options={{ headerShown: false }} />
     </Stack>
   );
 }
@@ -39,7 +42,9 @@ export default function RootLayout() {
   }, []);
 
   useEffect(() => {
+    console.log('App Layout: Effect triggered', { fontsLoaded, fontError, timedOut });
     if (fontsLoaded || fontError || timedOut) {
+      console.log('App Layout: Hiding splash screen');
       SplashScreen.hideAsync();
     }
   }, [fontsLoaded, fontError, timedOut]);
@@ -48,6 +53,7 @@ export default function RootLayout() {
 
   return (
     <ErrorBoundary>
+      <StatusBar style="dark" />
       <QueryClientProvider client={queryClient}>
         <GestureHandlerRootView style={{ flex: 1 }}>
           <KeyboardProvider>
