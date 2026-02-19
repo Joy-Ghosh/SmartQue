@@ -200,6 +200,7 @@ export default function WalkthroughScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
+        overflow: 'hidden',
     },
     blob: {
         position: 'absolute',

@@ -263,6 +263,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.background,
+    overflow: 'hidden',
   },
   centerContent: {
     justifyContent: 'center',

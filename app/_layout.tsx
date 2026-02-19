@@ -4,7 +4,6 @@ import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import React, { useEffect, useState } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { queryClient } from '@/lib/query-client';
 import { QueueProvider } from '@/lib/queue-context';
@@ -56,11 +55,9 @@ export default function RootLayout() {
       <StatusBar style="dark" />
       <QueryClientProvider client={queryClient}>
         <GestureHandlerRootView style={{ flex: 1 }}>
-          <KeyboardProvider>
-            <QueueProvider>
-              <RootLayoutNav />
-            </QueueProvider>
-          </KeyboardProvider>
+          <QueueProvider>
+            <RootLayoutNav />
+          </QueueProvider>
         </GestureHandlerRootView>
       </QueryClientProvider>
     </ErrorBoundary>

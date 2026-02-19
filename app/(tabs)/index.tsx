@@ -166,7 +166,23 @@ export default function HomeScreen() {
                     </View>
                 </Animated.View>
 
-                {/* 2. Hero Section: Live Token or Welcome */}
+                {/* 2. Emergency Access Strip (Persistent) */}
+                <Animated.View entering={FadeInDown.duration(600).delay(150)} style={{ marginBottom: 20 }}>
+                    <Pressable
+                        style={styles.emergencyStrip}
+                        onPress={() => router.push({ pathname: '/clinic/1', params: { emergency: 'true' } })} // Mock: passing param or handled via context later
+                    >
+                        <View style={styles.emergencyContent}>
+                            <View style={styles.emergencyIconBg}>
+                                <Ionicons name="medical" size={14} color={Colors.medicalRed} />
+                            </View>
+                            <Text style={styles.emergencyText}>Need urgent medical help? <Text style={{ fontFamily: 'Inter_700Bold' }}>Emergency Priority</Text></Text>
+                        </View>
+                        <Ionicons name="arrow-forward" size={16} color={Colors.medicalRed} />
+                    </Pressable>
+                </Animated.View>
+
+                {/* 3. Context Aware Hero: Live Token OR Smart Recommendation */}
                 <Animated.View entering={FadeInDown.duration(600).delay(200)} style={styles.heroSection}>
                     {activeBooking ? (
                         <Pressable onPress={() => router.push('/(tabs)/token')}>
@@ -202,23 +218,41 @@ export default function HomeScreen() {
                             </GlassView>
                         </Pressable>
                     ) : (
-                        <GlassView style={styles.heroBanner} gradientColors={['#FFFFFF', '#F1F5F9']}>
-                            <View style={styles.heroContent}>
-                                <Text style={styles.heroTitle}>Skip the <Text style={{ color: Colors.primary }}>waiting room.</Text></Text>
-                                <Text style={styles.heroSub}>Book appointments & track queues in real-time.</Text>
-                                <GradientButton
-                                    title="Find a Clinic"
-                                    onPress={() => { }}
-                                    style={{ alignSelf: 'flex-start', marginTop: 10 }}
-                                    icon="search"
-                                />
-                            </View>
-                            <Image
-                                source={require('@/assets/images/ad1.png')}
-                                style={styles.heroImage}
-                                resizeMode="contain"
-                            />
-                        </GlassView>
+                        // Smart Recommendation Card (No Token State)
+                        <Link href="/clinic/1" asChild>
+                            <Pressable>
+                                <GlassView style={styles.smartCard} gradientColors={['#fff', '#F8FAFC']}>
+                                    <View style={styles.smartContent}>
+                                        <View style={styles.smartHeader}>
+                                            <View style={styles.recommendationBadge}>
+                                                <Ionicons name="flash" size={12} color={Colors.primary} />
+                                                <Text style={styles.recommendationText}>Fastest Near You</Text>
+                                            </View>
+                                            <Text style={styles.smartDistance}>1.2 km</Text>
+                                        </View>
+
+                                        <Text style={styles.smartTitle}>Jay Dental Clinic</Text>
+                                        <Text style={styles.smartDoctor}>Dr. John Doe • Dentist</Text>
+
+                                        <View style={styles.smartFooter}>
+                                            <View style={styles.smartStat}>
+                                                <Ionicons name="time-outline" size={14} color={Colors.success} />
+                                                <Text style={styles.smartStatText}>~10m wait</Text>
+                                            </View>
+                                            <View style={styles.dot} />
+                                            <View style={styles.smartStat}>
+                                                <Ionicons name="star" size={14} color={Colors.smartAmber} />
+                                                <Text style={styles.smartStatText}>4.8</Text>
+                                            </View>
+                                        </View>
+                                    </View>
+                                    <Image
+                                        source={{ uri: 'https://images.unsplash.com/photo-1629909613654-28e377c37b09?w=800&auto=format&fit=crop&q=60' }}
+                                        style={styles.smartImage}
+                                    />
+                                </GlassView>
+                            </Pressable>
+                        </Link>
                     )}
                 </Animated.View>
 
@@ -380,6 +414,7 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: Colors.background,
+        overflow: 'hidden', // Prevent horizontal scroll from decorative elements
     },
     // ... existing styles ...
     modalOverlay: {
@@ -758,5 +793,113 @@ const styles = StyleSheet.create({
         borderRadius: 1.5,
         backgroundColor: Colors.textMuted,
         marginHorizontal: 6,
+    },
+    // Emergency Strip
+    emergencyStrip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: '#FEF2F2',
+        padding: 12,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: '#FECACA',
+    },
+    emergencyContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+    },
+    emergencyIconBg: {
+        width: 28,
+        height: 28,
+        borderRadius: 10,
+        backgroundColor: '#FFE4E6',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    emergencyText: {
+        fontSize: 13,
+        color: Colors.medicalRed,
+        fontFamily: 'Inter_500Medium',
+    },
+
+    // Smart Suggestion Card
+    smartCard: {
+        flexDirection: 'row',
+        padding: 16,
+        borderRadius: 24,
+        ...Colors.shadows.md,
+        alignItems: 'center',
+        backgroundColor: '#fff',
+    },
+    smartContent: {
+        flex: 1,
+        paddingRight: 10,
+        gap: 4,
+    },
+    smartHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 4,
+    },
+    recommendationBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        backgroundColor: '#E0F2FE',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 8,
+    },
+    recommendationText: {
+        fontSize: 11,
+        color: Colors.primary,
+        fontFamily: 'Inter_600SemiBold',
+    },
+    smartDistance: {
+        fontSize: 12,
+        color: Colors.textSecondary,
+        fontFamily: 'Inter_500Medium',
+    },
+    smartTitle: {
+        fontSize: 18,
+        color: Colors.text,
+        fontFamily: 'Inter_700Bold',
+    },
+    smartDoctor: {
+        fontSize: 13,
+        color: Colors.textSecondary,
+        fontFamily: 'Inter_500Medium',
+        marginBottom: 4,
+    },
+    smartFooter: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginTop: 4,
+    },
+    smartStat: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+    },
+    smartStatText: {
+        fontSize: 13,
+        fontFamily: 'Inter_600SemiBold',
+        color: Colors.text,
+    },
+    dot: {
+        width: 3,
+        height: 3,
+        borderRadius: 1.5,
+        backgroundColor: Colors.borderLight,
+    },
+    smartImage: {
+        width: 80,
+        height: 80,
+        borderRadius: 16,
+        backgroundColor: Colors.borderLight,
     },
 });

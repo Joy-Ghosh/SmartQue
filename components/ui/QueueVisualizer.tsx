@@ -10,9 +10,10 @@ interface QueueVisualizerProps {
     userToken: number;
     estimatedWait: number;
     compact?: boolean;
+    minimal?: boolean;
 }
 
-export function QueueVisualizer({ total, serving, userToken, estimatedWait, compact = false }: QueueVisualizerProps) {
+export function QueueVisualizer({ total, serving, userToken, estimatedWait, compact = false, minimal = false }: QueueVisualizerProps) {
     const progress = Math.min(1, Math.max(0, serving / userToken));
     const progressValue = useSharedValue(0);
 
@@ -33,6 +34,21 @@ export function QueueVisualizer({ total, serving, userToken, estimatedWait, comp
                     <Animated.View style={[styles.fill, animatedStyle]} />
                 </View>
                 <Text style={styles.compactText}>{ahead} people ahead</Text>
+            </View>
+        );
+    }
+
+    if (minimal) {
+        return (
+            <View style={styles.minimalContainer}>
+                <View style={styles.track}>
+                    <View style={{ ...StyleSheet.absoluteFillObject, backgroundColor: '#E2E8F0', borderRadius: 4 }} />
+                    <Animated.View style={[styles.fill, animatedStyle, { backgroundColor: Colors.primary }]} />
+                </View>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
+                    <Text style={styles.minimalText}>Start</Text>
+                    <Text style={styles.minimalText}>Your Turn</Text>
+                </View>
             </View>
         );
     }
@@ -90,11 +106,19 @@ const styles = StyleSheet.create({
     compactContainer: {
         gap: 6,
     },
+    minimalContainer: {
+        gap: 4,
+    },
     compactText: {
         fontSize: 12,
         color: '#fff',
         fontFamily: 'Inter_500Medium',
         textAlign: 'right',
+    },
+    minimalText: {
+        fontSize: 10,
+        color: Colors.textMuted,
+        fontFamily: 'Inter_500Medium',
     },
     metricsRow: {
         flexDirection: 'row',
@@ -131,7 +155,7 @@ const styles = StyleSheet.create({
         gap: 8,
     },
     track: {
-        height: 8,
+        height: 6,
         backgroundColor: '#E2E8F0',
         borderRadius: 4,
         overflow: 'hidden',
@@ -140,6 +164,7 @@ const styles = StyleSheet.create({
     fill: {
         height: '100%',
         borderRadius: 4,
+        backgroundColor: Colors.primary,
     },
     progressLabels: {
         flexDirection: 'row',

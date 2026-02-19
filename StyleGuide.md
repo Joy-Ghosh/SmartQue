@@ -77,11 +77,31 @@ Based on an **8pt grid**.
 
 ## 5. Shadows
 
-We use colored shadows based on our primary indigo to create depth avoiding muddy grey shadows.
+## 5. Shadows & Elevation
 
-- **Small**: Elevation 2, subtle lift
-- **Medium**: Elevation 4, standard card lift
-- **Large**: Elevation 10, floating elements (modals, bottom sheets)
+We use **colored shadows** derived from our primary Indigo (`#1E2A5E`) instead of standard black/grey. This creates a cleaner, more premium depth effect that avoids "muddy" aesthetics.
+
+| Shadow Token | Elevation | Opacity | Use Case |
+|--------------|-----------|---------|----------|
+| **`shadows.sm`** | 2 | 5% | **Subtle Depth**. Clickable list items, buttons, small sticky headers. |
+| **`shadows.md`** | 4 | 8% | **Standard Cards**. The default for content cards, inputs, and distinct sections. |
+| **`shadows.lg`** | 10 | 12% | **Floating Elements**. Modals, bottom sheets, dropdown menus, floaty buttons. |
+| **`shadows.glow`** | 5 | 40% | **Active States**. Glowing effects for active tokens, primary calls-to-action, or success states (uses Teal). |
+
+### Usage Example
+```tsx
+import Colors from '@/constants/colors';
+
+// Standard Card
+<View style={{ ...Colors.shadows.md, backgroundColor: 'white', borderRadius: 16 }}>
+  ...
+</View>
+
+// Glowing Button (Custom Color)
+<View style={{ ...Colors.shadows.glow, shadowColor: Colors.primary }}>
+  ...
+</View>
+```
 
 ---
 

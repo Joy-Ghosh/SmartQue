@@ -42,7 +42,7 @@ export default function ClinicDetailScreen() {
   const [isBookingSheetOpen, setIsBookingSheetOpen] = useState(false);
   const [showSuccessOverlay, setShowSuccessOverlay] = useState(false);
   const [isWishlisted, setIsWishlisted] = useState(false);
-  const [activeTab, setActiveTab] = useState<'about' | 'reviews' | 'map'>('about');
+  const [activeTab, setActiveTab] = useState<'about' | 'reviews' | 'location'>('about');
 
   // Mock Data
   const currentToken = 12;
@@ -128,50 +128,144 @@ export default function ClinicDetailScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* Main Card */}
-        <GlassView style={styles.mainCard} intensity={80} gradientColors={['rgba(255,255,255,0.9)', 'rgba(255,255,255,0.95)']}>
+        <GlassView style={styles.mainCard} intensity={80} gradientColors={['rgba(255,255,255,0.95)', 'rgba(255,255,255,0.98)']}>
+          {/* 1. TRUST HEADER */}
           <View style={styles.titleRow}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.clinicName}>{clinic.name}</Text>
+              <View style={styles.badgeRow}>
+                <View style={styles.trustBadge}>
+                  <Ionicons name="shield-checkmark" size={12} color={Colors.primary} />
+                  <Text style={styles.trustBadgeText}>High Trust Clinic</Text>
+                </View>
+                <View style={[styles.trustBadge, { backgroundColor: '#ECFDF5' }]}>
+                  <Ionicons name="time" size={12} color={Colors.success} />
+                  <Text style={[styles.trustBadgeText, { color: Colors.success }]}>98% On Time</Text>
+                </View>
+              </View>
               <Text style={styles.doctorName}>{doctor.name}</Text>
               <Text style={styles.specialty}>{doctor.specialty} • {doctor.experience} yrs exp</Text>
+              <View style={styles.ratingRow}>
+                <Ionicons name="star" size={14} color={Colors.smartAmber} />
+                <Text style={styles.ratingText}>{doctor.rating} (500+ patients)</Text>
+              </View>
             </View>
-            <StatusBadge status={getStatus(estimatedWaitMins) as any} />
           </View>
 
           <View style={styles.divider} />
 
-          {/* Queue Live Status */}
-          <View style={styles.queueContainer}>
-            <Text style={styles.sectionTitle}>Live Queue</Text>
-            <QueueVisualizer
-              total={yourToken + 5}
-              serving={currentToken}
-              userToken={yourToken}
-              estimatedWait={estimatedWaitMins}
-            />
+          {/* 2. DECISION BLOCK: YOUR VISIT TIMING */}
+          <View style={styles.decisionBlock}>
+            <View style={styles.decisionHeader}>
+              <Text style={styles.decisionTitle}>Your Visit Timing</Text>
+              <View style={styles.liveTag}>
+                <View style={[styles.liveDot, { backgroundColor: '#10B981' }]} />
+                <Text style={styles.liveText}>Moving Fast</Text>
+              </View>
+            </View>
+
+            {/* Enhanced Timing Card */}
+            <View style={styles.timingCard}>
+              <View style={styles.timingRow}>
+                {/* Now Serving */}
+                <View style={styles.servingColumn}>
+                  <Text style={styles.timingLabel}>Now Serving</Text>
+                  <Text style={styles.timingValueAction}>{currentToken}</Text>
+                  <Text style={styles.timingSubLabel}>On Time</Text>
+                </View>
+
+                {/* Visual Connector */}
+                <View style={styles.connectorColumn}>
+                  <View style={styles.connectorLine} />
+                  <View style={styles.connectorDot} />
+                </View>
+
+                {/* Users Token */}
+                <LinearGradient
+                  colors={['#1E2A5E', '#2D3F84']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.tokenColumn}
+                >
+                  <View style={styles.yourTokenBadge}>
+                    <Text style={styles.yourTokenLabel}>YOU</Text>
+                  </View>
+                  <Text style={styles.timingValueMain}>{yourToken}</Text>
+                  <Text style={styles.timingSubInverse}>~{estimatedWaitMins} min wait</Text>
+                </LinearGradient>
+              </View>
+
+              {/* Leave By Alert */}
+              <View style={styles.leaveByContainer}>
+                <LinearGradient
+                  colors={['rgba(30, 42, 94, 0.03)', 'rgba(30, 42, 94, 0.08)']}
+                  style={styles.leaveByGradient}
+                >
+                  <View style={styles.iconCircle}>
+                    <Ionicons name="walk" size={18} color={Colors.primary} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.leaveByTitle}>Leave by 10:45 AM</Text>
+                    <Text style={styles.leaveBySub}>To reach comfortably on time.</Text>
+                  </View>
+                </LinearGradient>
+              </View>
+            </View>
+
+            {/* Visualizer simplified */}
+            <View style={{ marginTop: 12, opacity: 0.9 }}>
+              <QueueVisualizer
+                total={yourToken + 5}
+                serving={currentToken}
+                userToken={yourToken}
+                estimatedWait={estimatedWaitMins}
+                minimal={true}
+              />
+            </View>
           </View>
         </GlassView>
 
-        {/* Quick Stats Grid */}
-        <View style={styles.statsGrid}>
-          <GlassView style={styles.statCard} intensity={40} gradientColors={['#fff', '#F8FAFC']}>
-            <Ionicons name="time-outline" size={24} color={Colors.primary} />
-            <Text style={styles.statValue}>{estimatedWaitMins}m</Text>
-            <Text style={styles.statLabel}>Avg Wait</Text>
-          </GlassView>
-          <GlassView style={styles.statCard} intensity={40} gradientColors={['#fff', '#F8FAFC']}>
-            <Ionicons name="star" size={24} color={Colors.smartAmber} />
-            <Text style={styles.statValue}>{doctor.rating}</Text>
-            <Text style={styles.statLabel}>Rating</Text>
-          </GlassView>
-          <GlassView style={styles.statCard} intensity={40} gradientColors={['#fff', '#F8FAFC']}>
-            <Ionicons name="location-outline" size={24} color={Colors.secondary} />
-            <Text style={styles.statValue}>{clinic.distance}</Text>
-            <Text style={styles.statLabel}>Nearby</Text>
-          </GlassView>
+        {/* 3. VISUAL SUMMARY CARDS */}
+        <View style={styles.statsRow}>
+          <View style={styles.statCard}>
+            <View style={[styles.statIcon, { backgroundColor: '#F0F9FF' }]}>
+              <Ionicons name="cash-outline" size={18} color={Colors.primary} />
+            </View>
+            <View>
+              <Text style={styles.statValue}>₹500</Text>
+              <Text style={styles.statLabel}>Fees</Text>
+            </View>
+          </View>
+
+          <View style={styles.statCard}>
+            <View style={[styles.statIcon, { backgroundColor: '#ECFDF5' }]}>
+              <Ionicons name="location-outline" size={18} color={Colors.success} />
+            </View>
+            <View>
+              <Text style={styles.statValue}>{clinic.distance}</Text>
+              <Text style={styles.statLabel}>Kilometers</Text>
+            </View>
+          </View>
+
+          <View style={styles.statCard}>
+            <View style={[styles.statIcon, { backgroundColor: '#FFF7ED' }]}>
+              <Ionicons name="star-outline" size={18} color={Colors.smartAmber} />
+            </View>
+            <View>
+              <Text style={styles.statValue}>4.9</Text>
+              <Text style={styles.statLabel}>Rating</Text>
+            </View>
+          </View>
         </View>
 
-        {/* Tabs / Info */}
+        {/* 4. BOOKING EXPLANATION */}
+        <View style={styles.explanationBox}>
+          <Ionicons name="information-circle-outline" size={20} color={Colors.textSecondary} />
+          <Text style={styles.explanationText}>
+            Book now to secure Token #{yourToken}. We'll notify you exactly when to leave so you don't wait at the clinic.
+          </Text>
+        </View>
+
+        {/* 5. SECONDARY INFO TABS (Reordered) */}
         <View style={styles.infoSection}>
           <View style={styles.tabRow}>
             {['About', 'Reviews', 'Location'].map(tab => (
@@ -207,37 +301,35 @@ export default function ClinicDetailScreen() {
           </View>
         </View>
 
-        <View style={{ height: 100 }} />
+        <View style={{ height: 120 }} />
       </ScrollView>
 
       {/* Bottom Action Bar */}
-      <GlassView style={[styles.bottomBar, { paddingBottom: insets.bottom + 10 }]} intensity={95} gradientColors={['rgba(255,255,255,0.9)', '#fff']}>
+      <GlassView style={[styles.bottomBar, { paddingBottom: insets.bottom + 10 }]} intensity={95} gradientColors={['rgba(255,255,255,0.95)', '#fff']}>
         <View style={styles.bottomBarContent}>
-          <View>
-            <Text style={styles.priceLabel}>Consultation</Text>
-            <Text style={styles.priceValue}>₹500</Text>
-          </View>
-          <View style={styles.buttonGroup}>
-            <Pressable
-              style={styles.emergencyBtn}
-              onPress={() => {
-                if (activeBooking) {
-                  Alert.alert('Active Queue', 'You already have an active queue. Please cancel it first.');
-                  return;
-                }
-                setIsEmergency(true);
-                setIsBookingSheetOpen(true);
-              }}
-            >
-              <Ionicons name="warning" size={18} color={Colors.danger} />
-            </Pressable>
-            <GradientButton
-              title="Book Token"
-              onPress={handleOpenBookingSheet}
-              style={{ flex: 1 }}
-              icon="ticket-outline"
-            />
-          </View>
+          {/* Emergency Text Link */}
+          <Pressable
+            style={styles.emergencyLink}
+            onPress={() => {
+              if (activeBooking) {
+                Alert.alert('Active Queue', 'You already have an active queue. Please cancel it first.');
+                return;
+              }
+              setIsEmergency(true);
+              setIsBookingSheetOpen(true);
+            }}
+          >
+            <Text style={styles.emergencyLinkText}>Having an emergency? <Text style={{ textDecorationLine: 'underline', fontFamily: 'Inter_600SemiBold' }}>Request Priority</Text></Text>
+          </Pressable>
+
+          {/* Main Booking Button */}
+          <GradientButton
+            title="Book Your Visit"
+            onPress={handleOpenBookingSheet}
+            style={{ width: '100%' }}
+            textStyle={{ fontSize: 16, fontFamily: 'Inter_700Bold' }}
+            icon="ticket-outline"
+          />
         </View>
       </GlassView>
 
@@ -272,6 +364,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.background,
+    overflow: 'hidden',
   },
   headerBgContainer: {
     position: 'absolute',
@@ -294,10 +387,10 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(0,0,0,0.3)',
+    backgroundColor: 'rgba(0,0,0,0.2)',
     alignItems: 'center',
     justifyContent: 'center',
-    backdropFilter: 'blur(10px)',
+
   },
   headerActions: {
     flexDirection: 'row',
@@ -313,10 +406,29 @@ const styles = StyleSheet.create({
     ...Colors.shadows.lg,
     marginBottom: 20,
   },
+
+  // TRUST HEADER
   titleRow: {
+    marginBottom: 0,
+  },
+  badgeRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    gap: 8,
+    marginBottom: 8,
+  },
+  trustBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  trustBadgeText: {
+    fontSize: 11,
+    fontFamily: 'Inter_600SemiBold',
+    color: Colors.primary,
   },
   clinicName: {
     fontSize: 14,
@@ -324,57 +436,253 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
-    marginBottom: 4,
   },
   doctorName: {
-    fontSize: 22,
+    fontSize: 24,
     fontFamily: 'Inter_700Bold',
     color: Colors.text,
     marginBottom: 2,
+    marginTop: 4,
   },
   specialty: {
     fontSize: 14,
     fontFamily: 'Inter_500Medium',
     color: Colors.textMuted,
-    marginBottom: 4,
+    marginBottom: 8,
+  },
+  ratingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  ratingText: {
+    fontSize: 13,
+    fontFamily: 'Inter_500Medium',
+    color: Colors.text,
   },
   divider: {
     height: 1,
     backgroundColor: Colors.borderLight,
-    marginVertical: 16,
+    marginVertical: 20,
   },
-  queueContainer: {
-    gap: 12,
+
+  // DECISION BLOCK V2
+  decisionBlock: {
+    gap: 16,
+    marginBottom: 8,
   },
-  sectionTitle: {
-    fontSize: 16,
-    fontFamily: 'Inter_600SemiBold',
+  decisionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  decisionTitle: {
+    fontSize: 18,
+    fontFamily: 'Inter_700Bold',
     color: Colors.text,
   },
-  statsGrid: {
+  liveTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.2)',
+  },
+  liveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: Colors.success,
+  },
+  liveText: {
+    fontSize: 12,
+    fontFamily: 'Inter_600SemiBold',
+    color: Colors.success,
+  },
+
+  // Timing Card
+  timingCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.04)',
+    overflow: 'hidden',
+    ...Colors.shadows.sm,
+  },
+  timingRow: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    height: 120,
+  },
+  servingColumn: {
+    flex: 1,
+    padding: 20,
+    justifyContent: 'center',
+  },
+  timingLabel: {
+    fontSize: 13,
+    fontFamily: 'Inter_500Medium',
+    color: Colors.textMuted,
+    marginBottom: 6,
+  },
+  timingSubLabel: {
+    fontSize: 12,
+    fontFamily: 'Inter_500Medium',
+    color: Colors.success,
+    marginTop: 4,
+  },
+  timingValueAction: {
+    fontSize: 36,
+    fontFamily: 'Inter_700Bold',
+    color: Colors.text,
+    letterSpacing: -1,
+  },
+
+  // Connector
+  connectorColumn: {
+    width: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  connectorLine: {
+    width: 2,
+    height: '100%',
+    backgroundColor: '#F1F5F9',
+  },
+  connectorDot: {
+    position: 'absolute',
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#CBD5E1',
+  },
+
+  // Token Column
+  tokenColumn: {
+    flex: 1.2,
+    padding: 20,
+    justifyContent: 'center',
+    alignItems: 'flex-start',
+    position: 'relative',
+  },
+  yourTokenBadge: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  yourTokenLabel: {
+    fontSize: 10,
+    fontFamily: 'Inter_700Bold',
+    color: '#fff',
+  },
+  timingValueMain: {
+    fontSize: 42,
+    fontFamily: 'Inter_700Bold',
+    color: '#fff',
+    letterSpacing: -1,
+    lineHeight: 48,
+    marginBottom: 2,
+  },
+  timingSubInverse: {
+    fontSize: 13,
+    fontFamily: 'Inter_500Medium',
+    color: 'rgba(255,255,255,0.8)',
+  },
+
+  // Leave By
+  leaveByContainer: {
+    padding: 8,
+  },
+  leaveByGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 12,
+    borderRadius: 16,
+  },
+  iconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: Platform.OS === 'ios' ? '#fff' : 'rgba(255,255,255,0.8)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Colors.shadows.sm,
+  },
+  leaveByTitle: {
+    fontSize: 14,
+    fontFamily: 'Inter_700Bold',
+    color: Colors.text,
+  },
+  leaveBySub: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    fontFamily: 'Inter_400Regular',
+  },
+
+  // STATS ROW V2
+  statsRow: {
     flexDirection: 'row',
     gap: 12,
     marginBottom: 24,
   },
   statCard: {
     flex: 1,
+    backgroundColor: '#fff',
     borderRadius: 16,
-    padding: 16,
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    ...Colors.shadows.sm,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.04)',
+  },
+  statIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    ...Colors.shadows.sm,
   },
   statValue: {
-    fontSize: 16,
+    fontSize: 14,
     fontFamily: 'Inter_700Bold',
     color: Colors.text,
   },
   statLabel: {
-    fontSize: 12,
+    fontSize: 11,
     fontFamily: 'Inter_500Medium',
-    color: Colors.textSecondary,
+    color: Colors.textMuted,
   },
+
+  // EXPLANATION
+  explanationBox: {
+    flexDirection: 'row',
+    gap: 10,
+    padding: 16,
+    // backgroundColor: 'rgba(255,255,255,0.6)',
+    marginBottom: 24,
+    alignItems: 'flex-start',
+  },
+  explanationText: {
+    flex: 1,
+    fontSize: 13,
+    fontFamily: 'Inter_400Regular',
+    color: Colors.textSecondary,
+    lineHeight: 18,
+  },
+
+  // INFO & TABS
   infoSection: {
     marginTop: 0,
   },
@@ -418,46 +726,28 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
   },
+
+  // BOTTOM ACTION BAR
   bottomBar: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    paddingTop: 16,
+    paddingTop: 12,
     paddingHorizontal: 20,
     borderTopWidth: 1,
     borderTopColor: 'rgba(0,0,0,0.05)',
   },
   bottomBarContent: {
-    flexDirection: 'row',
+    gap: 12,
     alignItems: 'center',
-    justifyContent: 'space-between',
   },
-  priceLabel: {
+  emergencyLink: {
+    paddingVertical: 4,
+  },
+  emergencyLinkText: {
     fontSize: 12,
     fontFamily: 'Inter_500Medium',
-    color: Colors.textMuted,
-  },
-  priceValue: {
-    fontSize: 20,
-    fontFamily: 'Inter_700Bold',
-    color: Colors.text,
-  },
-  buttonGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    flex: 1,
-    marginLeft: 20,
-  },
-  emergencyBtn: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: Colors.dangerBg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: Colors.medicalRed + '20',
+    color: Colors.medicalRed,
   },
 });
