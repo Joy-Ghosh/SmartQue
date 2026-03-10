@@ -1,0 +1,99 @@
+# DESIGN AND STYLE GUIDE SYSTEM
+
+## 1. TYPOGRAPHY (Fonts)
+Font Family (Inter):
+- Regular: Inter_400Regular
+- Medium: Inter_500Medium
+- SemiBold: Inter_600SemiBold
+- Bold: Inter_700Bold
+
+Line Heights:
+- Tight: 1.2
+- Normal: 1.5
+- Relaxed: 1.75
+
+Headings (h1 to h8) & Body Sizes:
+- h1 (Display): 48px | Bold | Line Height: Tight (1.2) - Used for major landing page headers
+- h2 (XXXL): 32px | Bold | Line Height: Tight (1.2) - Used for section headers
+- h3 (XXL): 24px | SemiBold/Bold | Line Height: Normal (1.5) - Used for subsection headers
+- h4 (XL): 20px | SemiBold | Line Height: Normal (1.5) - Used for prominent card titles
+- h5 (LG): 18px | Medium/SemiBold | Line Height: Normal (1.5) - Used for standard card titles
+- h6 (MD): 16px | Medium | Line Height: Normal (1.5) - Used for primary body text, buttons
+- h7 (Base): 14px | Regular/Medium | Line Height: Relaxed (1.75) - Used for secondary body text, inputs
+- h8 (SM/XS): 12px / 10px | Regular | Line Height: Relaxed (1.75) - Used for captions, overlines, small labels
+
+
+## 2. COLORS
+Core Brand Colors (Identity Layer):
+- Primary (Deep Intelligent Indigo): #1E2A5E - Trustworthy, modern, intelligent
+- Primary Light: #3A4B8A - Lighter indigo for hover/gradients
+- Primary Dark: #0F1635 - Darker indigo for depth/pressed
+- Primary Bg: #E8EAF6 - Indigo tint for backgrounds
+
+Secondary Brand Colors (Digital Teal):
+- Secondary: #1FB6A6 - Tech + healthcare fusion
+- Secondary Light: #5FE0D3 - Lighter teal/glow
+- Secondary Dark: #127066 - Darker teal
+- Secondary Bg: #E0F2F1 - Teal tint for backgrounds
+
+Neutral & Surface Colors:
+- Background: #F8FAFC (Ultra-light cool grey/white)
+- Surface: #FFFFFF (Pure White)
+- Surface Glass: rgba(255, 255, 255, 0.7)
+- Surface Glass Dark: rgba(15, 23, 42, 0.6)
+
+Text Colors:
+- Text Primary (Slate 900): #0F172A - Primary text (sharp, readable)
+- Text Secondary (Slate 600): #475569 - Secondary text
+- Text Muted (Slate 400): #94A3B8 - Muted/Placeholder
+- Text Inverse: #FFFFFF - White text on dark backgrounds
+
+Border Colors:
+- Border (Slate 200): #E2E8F0
+- Border Light (Slate 100): #F1F5F9
+
+Action & Emotional Trigger Colors:
+- Smart Amber (Attention): #FB923C - "Leave Now", Attention
+- Confidence Green (Success/Go): #10B981 - Success, Go
+- Medical Red (Emergency/Error): #EF4444 - Emergency, Error
+- Waiting Grey (Neutral Status): #64748B - Neutral status
+
+Gradients:
+- Primary: #1E2A5E to #1FB6A6 (Indigo -> Teal)
+- Dark: #0F172A to #1E2A5E (Slate -> Indigo)
+- Glass: rgba(255,255,255,0.8) to rgba(255,255,255,0.4) (Frost effect)
+- Soft: #F8FAFC to #E2E8F0 (Subtle background)
+- Orange: #FB923C to #F59E0B (Amber -> Yellow)
+- Green: #34D399 to #10B981 (Green -> Emerald)
+- Red: #F87171 to #EF4444 (Red -> Dark Red)
+
+
+## 3. SHAPES, BORDERS & SHADOWS
+Spacing System (8pt grid basis):
+- XS: 4px
+- SM: 8px
+- MD: 16px
+- LG: 24px
+- XL: 32px
+- XXL: 48px
+- XXXL: 64px
+- Specific Usages: Screen Padding (20px), Gutter (16px), Card Padding (20px)
+
+Border Radius (Shapes):
+- SM: 8px (Small elements, subtle rounding)
+- MD: 12px (Standard cards, inputs, moderate rounding)
+- LG: 16px (Buttons, main modal contents, clear rounding)
+- XL: 24px (Large cards, containers, soft organic shapes)
+- XXL: 32px (Bottom sheets, large structural elements)
+- Full: 9999px (Pills, badges, circular avatars, round buttons)
+
+Shadows & Elevation (Depth):
+- SM (Elevation 2): Soft subtle shadow (y: 2, radius: 3, opacity: 5%)
+- MD (Elevation 4): Medium float shadow (y: 4, radius: 8, opacity: 10%)
+- LG (Elevation 10): Large pop-out shadow (y: 10, radius: 20, opacity: 15%)
+- Glow (Elevation 5): Teal glow effect for primary interactive/highlighted elements (radius: 10, opacity: 40%, #1FB6A6)
+
+Component Specific Shapes & Styles:
+- Cards: Radius XL (24px), White Surface (#FFFFFF), Medium Shadow (MD)
+- Buttons (Primary): Radius LG (16px), Background Indigo (#1E2A5E), Centered Bold Text, Padding Vertical 16px
+- Inputs: Radius LG (16px), Height 50px, Background Surface (#F8FAFC), 16px Horizontal Padding
