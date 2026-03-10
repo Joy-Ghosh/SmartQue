@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, View, Pressable, Platform, Modal, ScrollView } from 'react-native';
+import { StyleSheet, Text, View, Pressable, Platform, Modal, ScrollView, TextInput } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
@@ -48,11 +48,25 @@ export default function SmartBookingSheet({
     consultationFee = 500,
     isEmergency = false,
 }: SmartBookingSheetProps) {
-    const [step, setStep] = useState<1 | 2 | 3>(1);
+    const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
+    const [phone, setPhone] = useState('');
+    const [name, setName] = useState('');
     const [selectedPatient, setSelectedPatient] = useState<Patient>(PATIENTS[0]);
     const [selectedTravelMode, setSelectedTravelMode] = useState<TravelMode>(TRAVEL_MODES[0]);
 
     const themeColor = isEmergency ? Colors.medicalRed : Colors.primary;
+
+    React.useEffect(() => {
+        if (phone.length === 10) {
+            const timer = setTimeout(() => {
+                setName('Joy Ghosh');
+                if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            }, 600);
+            return () => clearTimeout(timer);
+        } else {
+            setName('');
+        }
+    }, [phone]);
 
     const handlePatientSelect = (patient: Patient) => {
         setSelectedPatient(patient);
@@ -68,10 +82,14 @@ export default function SmartBookingSheet({
         if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         onConfirm({ patient: selectedPatient, travelMode: selectedTravelMode });
         setStep(1);
+        setPhone('');
+        setName('');
     };
 
     const handleClose = () => {
         setStep(1);
+        setPhone('');
+        setName('');
         onClose();
     };
 
@@ -91,10 +109,60 @@ export default function SmartBookingSheet({
                             <View style={[styles.progressDot, step >= 2 && { backgroundColor: themeColor }]} />
                             <View style={[styles.progressLine, step >= 3 && { backgroundColor: themeColor }]} />
                             <View style={[styles.progressDot, step >= 3 && { backgroundColor: themeColor }]} />
+                            <View style={[styles.progressLine, step >= 4 && { backgroundColor: themeColor }]} />
+                            <View style={[styles.progressDot, step >= 4 && { backgroundColor: themeColor }]} />
                         </View>
 
-                        {/* Step 1: Patient */}
+                        {/* Step 1: Phone & Seamless Auth */}
                         {step === 1 && (
+                            <View style={styles.stepContainer}>
+                                <Text style={styles.stepTitle}>Let's secure your spot</Text>
+                                <Text style={styles.stepSubtitle}>Just your number to instantly book.</Text>
+
+                                <View style={styles.inputCard}>
+                                    <Text style={styles.label}>Mobile Number</Text>
+                                    <View style={styles.inputRow}>
+                                        <Text style={styles.prefix}>+91</Text>
+                                        <View style={styles.inputDivider} />
+                                        <React.Fragment>
+                                            {/* use React.Fragment to avoid TS error, use react-native TextInput */}
+                                            <TextInput
+                                                style={styles.input}
+                                                placeholder="00000 00000"
+                                                placeholderTextColor={Colors.textMuted}
+                                                keyboardType="number-pad"
+                                                maxLength={10}
+                                                value={phone}
+                                                onChangeText={setPhone}
+                                                autoFocus
+                                            />
+                                        </React.Fragment>
+                                    </View>
+                                </View>
+
+                                {name ? (
+                                    <View style={styles.shadowProfileBox}>
+                                        <Ionicons name="checkmark-circle" size={18} color={Colors.success} style={{ marginRight: 6 }} />
+                                        <Text style={styles.shadowProfileText}>Welcome back, <Text style={{ fontFamily: 'Inter_700Bold' }}>{name}</Text></Text>
+                                    </View>
+                                ) : (
+                                    <View style={{ height: 44 }} />
+                                )}
+
+                                <View style={styles.navRow}>
+                                    <GradientButton 
+                                        title="Continue" 
+                                        onPress={() => setStep(2)} 
+                                        variant={isEmergency ? 'danger' : 'primary'} 
+                                        style={{ flex: 1 }} 
+                                        disabled={phone.length !== 10} 
+                                    />
+                                </View>
+                            </View>
+                        )}
+
+                        {/* Step 2: Patient */}
+                        {step === 2 && (
                             <View style={styles.stepContainer}>
                                 <Text style={styles.stepTitle}>Who is the patient?</Text>
                                 <Text style={styles.stepSubtitle}>Select who is visiting the doctor.</Text>
@@ -120,13 +188,14 @@ export default function SmartBookingSheet({
                                 </View>
 
                                 <View style={styles.navRow}>
-                                    <GradientButton title="Next" onPress={() => setStep(2)} variant={isEmergency ? 'danger' : 'primary'} style={{ flex: 1 }} />
+                                    <GradientButton title="Back" onPress={() => setStep(1)} variant="outline" style={{ flex: 0.4 }} />
+                                    <GradientButton title="Next" onPress={() => setStep(3)} variant={isEmergency ? 'danger' : 'primary'} style={{ flex: 1 }} />
                                 </View>
                             </View>
                         )}
 
-                        {/* Step 2: Transport */}
-                        {step === 2 && (
+                        {/* Step 3: Transport */}
+                        {step === 3 && (
                             <View style={styles.stepContainer}>
                                 <Text style={styles.stepTitle}>How are you travelling?</Text>
                                 <Text style={styles.stepSubtitle}>We'll calculate when you should leave.</Text>
@@ -153,14 +222,14 @@ export default function SmartBookingSheet({
                                 </View>
 
                                 <View style={styles.navRow}>
-                                    <GradientButton title="Back" onPress={() => setStep(1)} variant="outline" style={{ flex: 0.4 }} />
-                                    <GradientButton title="Next" onPress={() => setStep(3)} variant={isEmergency ? 'danger' : 'primary'} style={{ flex: 1 }} />
+                                    <GradientButton title="Back" onPress={() => setStep(2)} variant="outline" style={{ flex: 0.4 }} />
+                                    <GradientButton title="Next" onPress={() => setStep(4)} variant={isEmergency ? 'danger' : 'primary'} style={{ flex: 1 }} />
                                 </View>
                             </View>
                         )}
 
-                        {/* Step 3: Confirm */}
-                        {step === 3 && (
+                        {/* Step 4: Confirm */}
+                        {step === 4 && (
                             <View style={styles.stepContainer}>
                                 <Text style={[styles.stepTitle, isEmergency && { color: Colors.medicalRed }]}>
                                     {isEmergency ? 'Emergency Booking' : 'Confirm Appointment'}
@@ -184,7 +253,7 @@ export default function SmartBookingSheet({
                                 </View>
 
                                 <View style={styles.navRow}>
-                                    <GradientButton title="Back" onPress={() => setStep(2)} variant="outline" style={{ flex: 0.4 }} />
+                                    <GradientButton title="Back" onPress={() => setStep(3)} variant="outline" style={{ flex: 0.4 }} />
                                     <GradientButton
                                         title={isEmergency ? "Confirm Priority" : "Confirm Booking"}
                                         onPress={handleConfirm}
@@ -319,5 +388,54 @@ const styles = StyleSheet.create({
     divider: {
         height: 1,
         backgroundColor: Colors.borderLight,
+    },
+    inputCard: {
+        padding: 20,
+        borderRadius: 20,
+        backgroundColor: Colors.background,
+        borderWidth: 1,
+        borderColor: Colors.borderLight,
+        marginBottom: 8,
+    },
+    label: {
+        fontFamily: 'Inter_600SemiBold',
+        fontSize: 13,
+        color: Colors.textSecondary,
+        marginBottom: 12,
+    },
+    inputRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    prefix: {
+        fontFamily: 'Inter_600SemiBold',
+        fontSize: 16,
+        color: Colors.text,
+    },
+    inputDivider: {
+        width: 1,
+        height: 24,
+        backgroundColor: Colors.borderLight,
+        marginHorizontal: 16,
+    },
+    input: {
+        flex: 1,
+        fontFamily: 'Inter_600SemiBold',
+        fontSize: 18,
+        color: Colors.text,
+        letterSpacing: 1,
+    },
+    shadowProfileBox: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 12,
+        backgroundColor: '#ECFDF5', // Light green 
+        borderRadius: 12,
+        height: 44,
+    },
+    shadowProfileText: {
+        fontSize: 14,
+        color: Colors.text,
+        fontFamily: 'Inter_500Medium',
     },
 });

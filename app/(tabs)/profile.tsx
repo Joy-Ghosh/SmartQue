@@ -113,6 +113,23 @@ export default function ProfileScreen() {
           </View>
         </GlassView>
 
+        {/* Post-Booking Elaboration Prompt */}
+        <GlassView intensity={90} style={styles.elaborationCard} border>
+          <View style={styles.elaborationRow}>
+            <View style={styles.elaborationIconWrap}>
+              <Ionicons name="document-text" size={24} color={Colors.primary} />
+            </View>
+            <View style={styles.elaborationTextWrap}>
+              <Text style={styles.elaborationTitle}>Complete Your Profile</Text>
+              <Text style={styles.elaborationSub}>Add a photo and your medical history to speed up future bookings.</Text>
+            </View>
+          </View>
+          <Pressable style={styles.elaborationBtn}>
+            <Text style={styles.elaborationBtnText}>Complete Now</Text>
+            <Ionicons name="arrow-forward" size={16} color="#fff" />
+          </Pressable>
+        </GlassView>
+
         {/* Menu Sections */}
         <View style={styles.menuGroup}>
           <Text style={styles.groupTitle}>My Account</Text>
@@ -168,7 +185,13 @@ export default function ProfileScreen() {
           </GlassView>
         </View>
 
-        <Pressable style={styles.logoutBtn}>
+        <Pressable style={styles.logoutBtn} onPress={async () => {
+          if (Platform.OS !== 'web') {
+            const Haptics = await import('expo-haptics');
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          }
+          router.replace('/(onboarding)/walkthrough');
+        }}>
           <Ionicons name="log-out-outline" size={20} color={Colors.danger} />
           <Text style={styles.logoutText}>Sign Out</Text>
         </Pressable>
@@ -305,6 +328,56 @@ const styles = StyleSheet.create({
     width: 1,
     height: 24,
     backgroundColor: Colors.borderLight,
+  },
+  elaborationCard: {
+    padding: 20,
+    borderRadius: 20,
+    backgroundColor: '#fff',
+    borderColor: Colors.primary + '30',
+    borderWidth: 1,
+  },
+  elaborationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    marginBottom: 16,
+  },
+  elaborationIconWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: Colors.primary + '15',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  elaborationTextWrap: {
+    flex: 1,
+  },
+  elaborationTitle: {
+    fontFamily: 'Inter_700Bold',
+    fontSize: 16,
+    color: Colors.text,
+    marginBottom: 4,
+  },
+  elaborationSub: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 13,
+    color: Colors.textSecondary,
+    lineHeight: 18,
+  },
+  elaborationBtn: {
+    backgroundColor: Colors.primary,
+    paddingVertical: 12,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  elaborationBtnText: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 15,
+    color: '#fff',
   },
   menuGroup: {
     gap: 12,
