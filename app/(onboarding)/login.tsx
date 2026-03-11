@@ -1,17 +1,17 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, Text, TextInput, KeyboardAvoidingView, Platform, Dimensions } from 'react-native';
+import { StyleSheet, View, Text, TextInput, KeyboardAvoidingView, Platform, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Colors from '@/constants/colors';
 import { GradientButton } from '@/components/ui/GradientButton';
-import { GlassView } from '@/components/ui/GlassView';
-
-const { width } = Dimensions.get('window');
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function LoginScreen() {
     const router = useRouter();
+    const insets = useSafeAreaInsets();
     const [phoneNumber, setPhoneNumber] = useState('');
+    const [isFocused, setIsFocused] = useState(false);
 
     const isValid = phoneNumber.length === 10;
 
@@ -22,28 +22,31 @@ export default function LoginScreen() {
     };
 
     return (
-        <View style={styles.container}>
-            <LinearGradient
-                colors={[Colors.background, '#F0F9FF']}
-                style={StyleSheet.absoluteFill}
-            />
-            {/* Background Blob */}
-            <View style={styles.blob} />
+        <View style={[styles.container, { paddingTop: insets.top }]}>
+            {/* Soft background decoration */}
+            <View style={styles.topBlob} />
+            <View style={styles.bottomBlob} />
 
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 style={styles.keyboardView}
             >
                 <View style={styles.content}>
-                    <View style={styles.header}>
-                        <View style={styles.iconWrap}>
-                            <Ionicons name="log-in-outline" size={32} color={Colors.primary} />
-                        </View>
-                        <Text style={styles.welcomeText}>Welcome to SmartQ</Text>
-                        <Text style={styles.subText}>Enter your mobile number to get started.</Text>
+                    {/* Icon mark */}
+                    <View style={styles.iconWrap}>
+                        <LinearGradient
+                            colors={Colors.gradients.primary}
+                            style={styles.iconGradient}
+                        >
+                            <Ionicons name="pulse" size={28} color="#fff" />
+                        </LinearGradient>
                     </View>
 
-                    <GlassView intensity={60} style={styles.inputCard} border>
+                    <Text style={styles.title}>Welcome to SmartQ</Text>
+                    <Text style={styles.subtitle}>Enter your mobile number to skip the waiting room forever.</Text>
+
+                    {/* Phone Input Card */}
+                    <View style={[styles.inputCard, isFocused && styles.inputCardFocused]}>
                         <Text style={styles.label}>Mobile Number</Text>
                         <View style={styles.inputRow}>
                             <View style={styles.prefixContainer}>
@@ -59,21 +62,31 @@ export default function LoginScreen() {
                                 maxLength={10}
                                 value={phoneNumber}
                                 onChangeText={setPhoneNumber}
+                                onFocus={() => setIsFocused(true)}
+                                onBlur={() => setIsFocused(false)}
                                 autoFocus
                             />
+                            {phoneNumber.length > 0 && (
+                                <Pressable onPress={() => setPhoneNumber('')}>
+                                    <Ionicons name="close-circle" size={18} color={Colors.textMuted} />
+                                </Pressable>
+                            )}
                         </View>
-                    </GlassView>
+                    </View>
 
                     <GradientButton
-                        title="Get OTP"
+                        title={isValid ? 'Get OTP' : `${phoneNumber.length}/10 digits`}
                         onPress={handleGetOTP}
                         disabled={!isValid}
                         icon="arrow-forward"
-                        style={{ marginTop: 24 }}
+                        style={{ marginTop: 20, borderRadius: 16 }}
                     />
 
                     <Text style={styles.footerText}>
-                        By continuing, you agree to our <Text style={styles.link}>Terms</Text> & <Text style={styles.link}>Privacy Policy</Text>.
+                        By continuing, you agree to our{' '}
+                        <Text style={styles.link}>Terms</Text>
+                        {' '}&{' '}
+                        <Text style={styles.link}>Privacy Policy</Text>.
                     </Text>
                 </View>
             </KeyboardAvoidingView>
@@ -84,60 +97,80 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
+        backgroundColor: Colors.background,
     },
-    blob: {
+    topBlob: {
         position: 'absolute',
-        top: -100,
-        right: -100,
-        width: 400,
-        height: 400,
-        borderRadius: 200,
-        backgroundColor: Colors.primary + '10',
+        top: -120,
+        right: -80,
+        width: 320,
+        height: 320,
+        borderRadius: 160,
+        backgroundColor: Colors.primaryBg,
+        opacity: 0.8,
+    },
+    bottomBlob: {
+        position: 'absolute',
+        bottom: -80,
+        left: -60,
+        width: 240,
+        height: 240,
+        borderRadius: 120,
+        backgroundColor: Colors.secondaryBg,
+        opacity: 0.6,
     },
     keyboardView: {
         flex: 1,
     },
     content: {
         flex: 1,
-        padding: 24,
+        padding: 28,
         justifyContent: 'center',
-    },
-    header: {
-        marginBottom: 40,
-        alignItems: 'center',
     },
     iconWrap: {
-        width: 64,
-        height: 64,
-        borderRadius: 32,
-        backgroundColor: '#fff',
+        alignSelf: 'flex-start',
+        marginBottom: 28,
+    },
+    iconGradient: {
+        width: 58,
+        height: 58,
+        borderRadius: 18,
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: 24,
-        ...Colors.shadows.md,
     },
-    welcomeText: {
+    title: {
         fontFamily: 'Inter_700Bold',
-        fontSize: 28,
+        fontSize: 30,
         color: Colors.text,
         marginBottom: 8,
+        letterSpacing: -0.5,
     },
-    subText: {
-        fontFamily: 'Inter_500Medium',
+    subtitle: {
+        fontFamily: 'Inter_400Regular',
         fontSize: 15,
         color: Colors.textSecondary,
-        textAlign: 'center',
+        lineHeight: 22,
+        marginBottom: 36,
     },
     inputCard: {
-        padding: 20,
+        backgroundColor: Colors.surface,
         borderRadius: 20,
-        backgroundColor: '#fff',
+        padding: 20,
+        borderWidth: 1.5,
+        borderColor: Colors.border,
+        ...Colors.shadows.sm,
+    },
+    inputCardFocused: {
+        borderColor: Colors.primary,
+        ...Colors.shadows.md,
     },
     label: {
         fontFamily: 'Inter_600SemiBold',
-        fontSize: 13,
-        color: Colors.textSecondary,
+        fontSize: 12,
+        color: Colors.textMuted,
         marginBottom: 12,
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
     },
     inputRow: {
         flexDirection: 'row',
@@ -152,29 +185,30 @@ const styles = StyleSheet.create({
         fontSize: 20,
     },
     prefix: {
-        fontFamily: 'Inter_600SemiBold',
+        fontFamily: 'Inter_700Bold',
         fontSize: 16,
         color: Colors.text,
     },
     divider: {
-        width: 1,
-        height: 24,
-        backgroundColor: Colors.borderLight,
+        width: 1.5,
+        height: 22,
+        backgroundColor: Colors.border,
         marginHorizontal: 16,
     },
     input: {
         flex: 1,
-        fontFamily: 'Inter_600SemiBold',
-        fontSize: 18,
+        fontFamily: 'Inter_700Bold',
+        fontSize: 20,
         color: Colors.text,
-        letterSpacing: 1,
+        letterSpacing: 2,
     },
     footerText: {
         textAlign: 'center',
         fontFamily: 'Inter_400Regular',
-        fontSize: 13,
+        fontSize: 12,
         color: Colors.textMuted,
-        marginTop: 32,
+        marginTop: 24,
+        lineHeight: 18,
     },
     link: {
         color: Colors.primary,

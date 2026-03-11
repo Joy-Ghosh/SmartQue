@@ -26,21 +26,22 @@ export default function TabLayout() {
           bottom: 0,
           left: 0,
           right: 0,
-          height: isIOS ? 90 : 70,
-          backgroundColor: '#fff',
-          borderTopWidth: 0,
-          elevation: 10,
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: -2 },
-          shadowOpacity: 0.05,
-          shadowRadius: 10,
-          paddingTop: 10,
+          height: isIOS ? 88 : 68,
+          backgroundColor: 'rgba(255, 249, 245, 0.95)',
+          borderTopWidth: 1,
+          borderTopColor: Colors.border,
+          elevation: 0,
+          shadowColor: Colors.shadows.lg.shadowColor,
+          shadowOffset: { width: 0, height: -4 },
+          shadowOpacity: 0.08,
+          shadowRadius: 12,
+          paddingTop: 8,
         },
         tabBarLabelStyle: {
           fontFamily: 'Inter_600SemiBold',
           fontSize: 10,
-          marginTop: 4,
-          marginBottom: isIOS ? 0 : 8,
+          marginTop: 2,
+          marginBottom: isIOS ? 0 : 6,
         },
       }}
     >
@@ -50,7 +51,7 @@ export default function TabLayout() {
           title: 'Home',
           tabBarIcon: ({ color, focused }) => (
             <View style={[styles.tabIconContainer, focused && styles.activeTabPopup]}>
-              <Ionicons name={focused ? "home" : "home-outline"} size={22} color={focused ? Colors.primary : color} />
+              <Ionicons name={focused ? "home" : "home-outline"} size={22} color={color} />
             </View>
           ),
         }}
@@ -62,7 +63,7 @@ export default function TabLayout() {
           title: 'Explore',
           tabBarIcon: ({ color, focused }) => (
             <View style={[styles.tabIconContainer, focused && styles.activeTabPopup]}>
-              <Ionicons name={focused ? "compass" : "compass-outline"} size={22} color={focused ? Colors.primary : color} />
+              <Ionicons name={focused ? "compass" : "compass-outline"} size={22} color={color} />
             </View>
           ),
         }}
@@ -75,7 +76,7 @@ export default function TabLayout() {
           title: 'Token',
           tabBarIcon: ({ color, focused }) => (
             <View style={[styles.tabIconContainer, focused && styles.activeTabPopup]}>
-              <Ionicons name={focused ? "ticket" : "ticket-outline"} size={22} color={focused ? Colors.primary : color} />
+              <Ionicons name={focused ? "ticket" : "ticket-outline"} size={22} color={color} />
             </View>
           ),
         }}
@@ -88,7 +89,7 @@ export default function TabLayout() {
           title: 'Visits',
           tabBarIcon: ({ color, focused }) => (
             <View style={[styles.tabIconContainer, focused && styles.activeTabPopup]}>
-              <Ionicons name={focused ? "calendar" : "calendar-outline"} size={22} color={focused ? Colors.primary : color} />
+              <Ionicons name={focused ? "calendar" : "calendar-outline"} size={22} color={color} />
             </View>
           )
         }}
@@ -101,7 +102,7 @@ export default function TabLayout() {
           title: 'Profile',
           tabBarIcon: ({ color, focused }) => (
             <View style={[styles.tabIconContainer, focused && styles.activeTabPopup]}>
-              <Ionicons name={focused ? "person" : "person-outline"} size={22} color={focused ? Colors.primary : color} />
+              <Ionicons name={focused ? "person" : "person-outline"} size={22} color={color} />
             </View>
           ),
         }}
@@ -120,6 +121,6 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   activeTabPopup: {
-    backgroundColor: '#E0F2FE', // Very light primary blue
+    backgroundColor: Colors.primaryBg,
   }
 });

@@ -34,32 +34,24 @@ export function GradientButton({
         transform: [{ scale: scale.value }],
     }));
 
-    const handlePressIn = () => {
-        scale.value = withSpring(0.97);
-    };
+    const handlePressIn = () => { scale.value = withSpring(0.97, { damping: 15 }); };
+    const handlePressOut = () => { scale.value = withSpring(1, { damping: 15 }); };
 
-    const handlePressOut = () => {
-        scale.value = withSpring(1);
-    };
-
-    const getGradientColors = () => {
-        if (disabled) return ['#94A3B8', '#CBD5E1'] as const;
+    const getGradientColors = (): readonly [string, string] => {
+        if (disabled) return ['#C4C9E0', '#C4C9E0'];
         switch (variant) {
-            case 'secondary':
-                return Colors.gradients.glass;
-            case 'danger':
-                return Colors.gradients.red;
-            case 'outline':
-                return ['transparent', 'transparent'] as const;
+            case 'secondary': return ['#FFFFFF', '#F7F5F2'];
+            case 'danger': return Colors.gradients.red;
+            case 'outline': return ['transparent', 'transparent'];
             case 'primary':
-            default:
-                return Colors.gradients.primary;
+            default: return Colors.gradients.primary;
         }
     };
 
     const getTextColor = () => {
-        if (disabled) return '#F1F5F9';
-        if (variant === 'secondary' || variant === 'outline') return Colors.primary;
+        if (disabled) return '#8A8FA8';
+        if (variant === 'secondary') return Colors.primary;
+        if (variant === 'outline') return Colors.primary;
         return '#FFFFFF';
     };
 
@@ -71,8 +63,8 @@ export function GradientButton({
             disabled={disabled || isLoading}
             style={[
                 styles.container,
-                { ...Colors.shadows.sm },
                 variant === 'outline' && styles.outline,
+                variant === 'secondary' && styles.secondary,
                 style,
                 animatedStyle,
             ]}
@@ -80,14 +72,14 @@ export function GradientButton({
             <LinearGradient
                 colors={getGradientColors()}
                 start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={[styles.gradient, variant === 'outline' && styles.outlineGradient]}
+                end={{ x: 1, y: 0 }}
+                style={styles.gradient}
             >
                 {isLoading ? (
                     <ActivityIndicator color={getTextColor()} />
                 ) : (
                     <>
-                        {icon && <Ionicons name={icon} size={20} color={getTextColor()} style={{ marginRight: 8 }} />}
+                        {icon && <Ionicons name={icon} size={18} color={getTextColor()} style={{ marginRight: 6 }} />}
                         <Text style={[styles.text, { color: getTextColor() }, textStyle]}>{title}</Text>
                     </>
                 )}
@@ -99,10 +91,11 @@ export function GradientButton({
 const styles = StyleSheet.create({
     container: {
         borderRadius: 16,
-        overflow: 'hidden', // Ensure gradient respects border radius
+        overflow: 'hidden',
+        ...Colors.shadows.md,
     },
     gradient: {
-        paddingVertical: 14,
+        paddingVertical: 15,
         paddingHorizontal: 24,
         flexDirection: 'row',
         alignItems: 'center',
@@ -110,8 +103,8 @@ const styles = StyleSheet.create({
     },
     text: {
         fontFamily: 'Inter_600SemiBold',
-        fontSize: 16,
-        letterSpacing: 0.5,
+        fontSize: 15,
+        letterSpacing: 0.2,
     },
     outline: {
         borderWidth: 1.5,
@@ -120,7 +113,10 @@ const styles = StyleSheet.create({
         shadowOpacity: 0,
         elevation: 0,
     },
-    outlineGradient: {
-        // Transparent gradient content
+    secondary: {
+        borderWidth: 1.5,
+        borderColor: Colors.border,
+        shadowOpacity: 0,
+        elevation: 0,
     },
 });

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     StyleSheet,
     Text,
@@ -6,900 +6,1011 @@ import {
     ScrollView,
     Pressable,
     Image,
-    Dimensions,
     TextInput,
     StatusBar,
     Modal,
-    Platform
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Link, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
+import Animated, {
+    FadeInDown,
+    useSharedValue,
+    useAnimatedStyle,
+    withRepeat,
+    withSequence,
+    withTiming,
+} from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import Colors from '@/constants/colors';
 import { useQueue } from '@/lib/queue-context';
-import { Layout } from '@/constants/layout';
-import { GlassView } from '@/components/ui/GlassView';
-import { StatusBadge } from '@/components/ui/StatusBadge';
-import { GradientButton } from '@/components/ui/GradientButton';
-import { QueueVisualizer } from '@/components/ui/QueueVisualizer';
 
-const { width } = Dimensions.get('window');
+// ─────────────────────────────────────────────────────────────────
+// Data
+// ─────────────────────────────────────────────────────────────────
+const LOCATIONS = ['Mumbai', 'Delhi', 'Bengaluru', 'Chennai', 'Pune', 'Hyderabad', 'Kolkata'];
 
-// Data for Location Selection
-const LOCATIONS = [
-    'New York',
-    'Los Angeles',
-    'Chicago',
-    'Houston',
-    'San Francisco',
-    'Miami',
-    'Seattle'
-];
-
-// Data for Category Grid with new brand colors
 const CATEGORIES = [
-    { id: 'all', name: 'All', icon: 'grid', color: '#F8FAFC', iconColor: '#64748B' },
-    { id: 'general', name: 'General', icon: 'medkit', color: '#EFF6FF', iconColor: '#3B82F6' },
-    { id: 'dental', name: 'Dental', icon: 'medical', color: '#F0FDFA', iconColor: '#14B8A6' },
-    { id: 'dermatology', name: 'Skin', icon: 'happy', color: '#FFF7ED', iconColor: '#F97316' },
-    { id: 'cardiology', name: 'Cardio', icon: 'heart', color: '#FEF2F2', iconColor: '#EF4444' },
-    { id: 'pediatrics', name: 'Pediatric', icon: 'people', color: '#ECFDF5', iconColor: '#10B981' },
-    { id: 'lab', name: 'Lab Tests', icon: 'flask', color: '#F3E8FF', iconColor: '#A855F7' },
-    { id: 'orthopedics', name: 'Orthopedic', icon: 'fitness', color: '#F0FDF4', iconColor: '#166534' },
+    { id: 'all',         name: 'All',       icon: 'apps',         color: Colors.primaryBg,   iconColor: Colors.primary },
+    { id: 'general',     name: 'General',   icon: 'medkit',       color: Colors.primaryBg,   iconColor: Colors.primary },
+    { id: 'dental',      name: 'Dental',    icon: 'medical',      color: Colors.secondaryBg, iconColor: Colors.secondary },
+    { id: 'dermatology', name: 'Skin',      icon: 'happy',        color: '#FEF3C7',          iconColor: Colors.smartAmber },
+    { id: 'cardiology',  name: 'Cardio',    icon: 'heart',        color: Colors.dangerBg,    iconColor: Colors.danger },
+    { id: 'pediatrics',  name: 'Kids',      icon: 'people',       color: Colors.successBg,   iconColor: Colors.success },
+    { id: 'lab',         name: 'Lab',       icon: 'flask',        color: '#F3E8FF',          iconColor: '#A855F7' },
+    { id: 'ortho',       name: 'Ortho',     icon: 'fitness',      color: '#F0FDF4',          iconColor: '#166534' },
 ];
 
-// Data for Nearby Clinics
-const CLINICS = [
+interface Clinic {
+    id: string;
+    name: string;
+    doctor: string;
+    specialty: string;
+    rating: number;
+    distance: string;
+    waitTimeMin: number;
+    services: string[];
+    image: string;
+    currentToken: number;
+    nextToken: number;
+}
+
+const CLINICS: Clinic[] = [
     {
         id: '1',
-        name: 'Jay Dental Clinic',
-        doctor: 'Dr. John Doe',
+        name: 'City Dental Clinic',
+        doctor: 'Dr. Aditi Kulkarni',
         specialty: 'Dentist',
         rating: 4.8,
         distance: '1.2 km',
         waitTimeMin: 10,
         services: ['dental', 'general'],
-        image: 'https://images.unsplash.com/photo-1629909613654-28e377c37b09?w=800&auto=format&fit=crop&q=60',
+        image: 'https://images.unsplash.com/photo-1629909613654-28e377c37b09?w=400&auto=format&fit=crop&q=60',
+        currentToken: 12,
+        nextToken: 13,
     },
     {
         id: '2',
-        name: 'City Health Center',
-        doctor: 'Dr. Sarah Smith',
-        specialty: 'General',
+        name: 'Lotus Medical Centre',
+        doctor: 'Dr. Rahul Mehta',
+        specialty: 'General Physician',
         rating: 4.5,
         distance: '2.5 km',
         waitTimeMin: 45,
         services: ['general'],
-        image: 'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?w=800&auto=format&fit=crop&q=60',
+        image: 'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?w=400&auto=format&fit=crop&q=60',
+        currentToken: 8,
+        nextToken: 20,
     },
     {
         id: '3',
-        name: 'Life Care Polyclinic',
-        doctor: 'Dr. Michael Brown',
-        specialty: 'Skin',
-        rating: 4.2,
+        name: 'SkinCare Plus',
+        doctor: 'Dr. Priya Sharma',
+        specialty: 'Dermatologist',
+        rating: 4.9,
         distance: '3.8 km',
         waitTimeMin: 75,
         services: ['dermatology', 'general'],
-        image: 'https://images.unsplash.com/photo-1538108149393-fbbd81895907?w=800&auto=format&fit=crop&q=60',
+        image: 'https://images.unsplash.com/photo-1538108149393-fbbd81895907?w=400&auto=format&fit=crop&q=60',
+        currentToken: 5,
+        nextToken: 17,
     },
 ];
 
+// ─────────────────────────────────────────────────────────────────
+// Sub-components
+// ─────────────────────────────────────────────────────────────────
+
+/** Animated live dot */
+function LiveDot({ color = Colors.success }: { color?: string }) {
+    const opacity = useSharedValue(1);
+    useEffect(() => {
+        opacity.value = withRepeat(
+            withSequence(withTiming(0.25, { duration: 700 }), withTiming(1, { duration: 700 })),
+            -1, false
+        );
+    }, []);
+    const style = useAnimatedStyle(() => ({ opacity: opacity.value }));
+    return <Animated.View style={[{ width: 6, height: 6, borderRadius: 3, backgroundColor: color }, style]} />;
+}
+
+/** Wait status config */
+function getWaitConfig(mins: number) {
+    if (mins < 15) return { color: Colors.success, bg: Colors.successBg, label: `${mins}m`, urgency: 'Fast' };
+    if (mins < 60) return { color: Colors.smartAmber, bg: Colors.warningBg, label: `${mins}m`, urgency: 'Moderate' };
+    return { color: Colors.danger, bg: Colors.dangerBg, label: `${Math.floor(mins / 60)}h+`, urgency: 'Long' };
+}
+
+/** Single clinic card — wait time as the dominant number */
+function ClinicCard({ clinic, index }: { clinic: Clinic; index: number }) {
+    const wait = getWaitConfig(clinic.waitTimeMin);
+    return (
+        <Animated.View entering={FadeInDown.duration(400).delay(350 + index * 80)}>
+            <Link href={`/clinic/${clinic.id}` as any} asChild>
+                <Pressable style={styles.clinicCard}>
+                    {/* Image */}
+                    <Image source={{ uri: clinic.image }} style={styles.clinicCardImage} />
+
+                    {/* Content */}
+                    <View style={styles.clinicCardBody}>
+                        {/* Name + specialty row */}
+                        <View>
+                            <Text style={styles.clinicCardName} numberOfLines={1}>{clinic.name}</Text>
+                            <Text style={styles.clinicCardDoctor} numberOfLines={1}>
+                                {clinic.doctor} · {clinic.specialty}
+                            </Text>
+                        </View>
+
+                        {/* Bottom row: rating + distance | wait time */}
+                        <View style={styles.clinicCardFooter}>
+                            <View style={styles.clinicCardMeta}>
+                                <Ionicons name="star" size={11} color={Colors.smartAmber} />
+                                <Text style={styles.clinicCardMetaText}>{clinic.rating}</Text>
+                                <View style={styles.metaDot} />
+                                <Text style={styles.clinicCardMetaText}>{clinic.distance}</Text>
+                            </View>
+
+                            {/* The wait number — THE thing the user cares about */}
+                            <View style={[styles.waitBadge, { backgroundColor: wait.bg }]}>
+                                <LiveDot color={wait.color} />
+                                <Text style={[styles.waitBadgeText, { color: wait.color }]}>
+                                    {wait.label} wait
+                                </Text>
+                            </View>
+                        </View>
+                    </View>
+                </Pressable>
+            </Link>
+        </Animated.View>
+    );
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Main Screen
+// ─────────────────────────────────────────────────────────────────
 export default function HomeScreen() {
     const insets = useSafeAreaInsets();
     const { activeBooking } = useQueue();
-    const [selectedLocation, setSelectedLocation] = useState('New York');
+    const [selectedLocation, setSelectedLocation] = useState('Mumbai');
     const [showLocationModal, setShowLocationModal] = useState(false);
     const [selectedCategory, setSelectedCategory] = useState('all');
+    const [searchQuery, setSearchQuery] = useState('');
 
-    // Filter clinics based on selected category
-    const filteredClinics = selectedCategory === 'all'
-        ? CLINICS
-        : CLINICS.filter(clinic => clinic.services.includes(selectedCategory));
+    const filteredClinics = CLINICS.filter(c => {
+        const matchesCat = selectedCategory === 'all' || c.services.includes(selectedCategory);
+        const matchesSearch = !searchQuery ||
+            c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            c.doctor.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            c.specialty.toLowerCase().includes(searchQuery.toLowerCase());
+        return matchesCat && matchesSearch;
+    });
 
-    // Helper for Status Badge Logic
-    const getStatus = (mins: number) => {
-        if (mins < 15) return 'success';
-        if (mins < 60) return 'live'; // or warning/amber
-        return 'alert';
-    };
+    // Area stats
+    const shortestWait = Math.min(...CLINICS.map(c => c.waitTimeMin));
+    const avgWait = Math.round(CLINICS.reduce((s, c) => s + c.waitTimeMin, 0) / CLINICS.length);
 
-    const getWaitLabel = (mins: number) => {
-        if (mins < 15) return `<15m`;
-        if (mins < 60) return `~${mins}m`;
-        return `1h+`;
-    };
+    // Time-based greeting
+    const hour = new Date().getHours();
+    const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
 
     return (
         <View style={styles.container}>
             <StatusBar barStyle="dark-content" />
-
-            {/* Background Gradient for Top Section */}
-            <View style={styles.topBg}>
-                <LinearGradient
-                    colors={['#E0F2FE', '#F8FAFC']}
-                    style={StyleSheet.absoluteFill}
-                    start={{ x: 0.5, y: 0 }}
-                    end={{ x: 0.5, y: 1 }}
-                />
-                {/* Decorative Circle 1 */}
-                <View style={[styles.decorativeCircle, { top: -50, right: -50, backgroundColor: 'rgba(31, 182, 166, 0.1)' }]} />
-                {/* Decorative Circle 2 */}
-                <View style={[styles.decorativeCircle, { top: 100, left: -80, width: 200, height: 200, backgroundColor: 'rgba(30, 42, 94, 0.05)' }]} />
-            </View>
-
             <ScrollView
                 contentContainerStyle={[
-                    styles.scrollContent,
-                    { paddingTop: insets.top + 10, paddingBottom: 100 },
+                    styles.scroll,
+                    { paddingTop: insets.top + 12, paddingBottom: 120 + insets.bottom },
                 ]}
                 showsVerticalScrollIndicator={false}
             >
-                {/* 1. Top Bar */}
-                <Animated.View entering={FadeInDown.duration(600).delay(100)} style={styles.topBar}>
+
+                {/* ══ TOP BAR ══════════════════════════════════════════════════ */}
+                <Animated.View entering={FadeInDown.duration(400).delay(0)} style={styles.topBar}>
+                    {/* Location selector */}
                     <Pressable style={styles.locationBtn} onPress={() => setShowLocationModal(true)}>
-                        <View style={styles.locationIconBg}>
-                            <Ionicons name="location" size={18} color={Colors.primary} />
+                        <View style={styles.locationIconWrap}>
+                            <Ionicons name="location" size={15} color={Colors.primary} />
                         </View>
                         <View>
-                            <Text style={styles.locationLabel}>Current Location</Text>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                                <Text style={styles.locationValue}>{selectedLocation}</Text>
-                                <Ionicons name="chevron-down" size={12} color={Colors.textSecondary} />
+                            <Text style={styles.locationMeta}>Your Location</Text>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                                <Text style={styles.locationCity}>{selectedLocation}</Text>
+                                <Ionicons name="chevron-down" size={11} color={Colors.textMuted} />
                             </View>
                         </View>
                     </Pressable>
 
-                    <View style={styles.topRightActions}>
-                        <Pressable style={styles.iconBtn} onPress={() => router.push('/notifications')}>
-                            <Ionicons name="notifications-outline" size={22} color={Colors.text} />
-                            <View style={styles.notifBadge} />
+                    {/* Actions */}
+                    <View style={styles.topActions}>
+                        <Pressable style={styles.iconBtn}>
+                            <Ionicons name="notifications-outline" size={20} color={Colors.text} />
+                            <View style={styles.notifDot} />
                         </Pressable>
                         <Pressable onPress={() => router.push('/(tabs)/profile')}>
                             <Image
-                                source={{ uri: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=800&auto=format&fit=crop&q=60' }}
+                                source={{ uri: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&auto=format&fit=crop&q=60' }}
                                 style={styles.avatar}
                             />
                         </Pressable>
                     </View>
                 </Animated.View>
 
-                {/* 2. Emergency Access Strip (Persistent) */}
-                <Animated.View entering={FadeInDown.duration(600).delay(150)} style={{ marginBottom: 20 }}>
-                    <Pressable
-                        style={styles.emergencyStrip}
-                        onPress={() => router.push({ pathname: '/clinic/1', params: { emergency: 'true' } })} // Mock: passing param or handled via context later
-                    >
-                        <View style={styles.emergencyContent}>
-                            <View style={styles.emergencyIconBg}>
-                                <Ionicons name="medical" size={14} color={Colors.medicalRed} />
-                            </View>
-                            <Text style={styles.emergencyText}>Need urgent medical help? <Text style={{ fontFamily: 'Inter_700Bold' }}>Emergency Priority</Text></Text>
-                        </View>
-                        <Ionicons name="arrow-forward" size={16} color={Colors.medicalRed} />
-                    </Pressable>
+                {/* ══ GREETING + SEARCH ════════════════════════════════════════ */}
+                <Animated.View entering={FadeInDown.duration(400).delay(60)} style={styles.greetRow}>
+                    <Text style={styles.greetText}>{greeting} 👋</Text>
+                    <Text style={styles.greetSubtext}>Find a clinic, skip the wait.</Text>
                 </Animated.View>
 
-                {/* 3. Context Aware Hero: Live Token OR Smart Recommendation */}
-                <Animated.View entering={FadeInDown.duration(600).delay(200)} style={styles.heroSection}>
-                    {activeBooking ? (
-                        <Pressable onPress={() => router.push('/(tabs)/token')}>
-                            <GlassView style={styles.activeCard} gradientColors={Colors.gradients.primary}>
-                                <View style={styles.activeCardHeader}>
-                                    <View>
-                                        <Text style={styles.activeLabel}>Live Token</Text>
-                                        <Text style={styles.activeDoctor}>{activeBooking.doctorName}</Text>
-                                        <Text style={styles.activeClinic}>{activeBooking.clinicName}</Text>
-                                    </View>
-                                    <View style={styles.tokenContainer}>
-                                        <Text style={styles.tokenLabel}>YOU</Text>
-                                        <Text style={styles.tokenNumber}>{activeBooking.tokenNumber}</Text>
-                                    </View>
-                                </View>
-
-                                <View style={styles.visualizerContainer}>
-                                    <QueueVisualizer
-                                        total={activeBooking.tokenNumber + 5}
-                                        serving={activeBooking.servingToken}
-                                        userToken={activeBooking.tokenNumber}
-                                        estimatedWait={Math.max(0, (activeBooking.tokenNumber - activeBooking.servingToken) * activeBooking.avgWaitTime)}
-                                    />
-                                </View>
-
-                                <View style={styles.activeCardFooter}>
-                                    <StatusBadge status="live" text="Tracking Live" />
-                                    <View style={styles.leaveTimeContainer}>
-                                        <Ionicons name="walk-outline" size={14} color="rgba(255,255,255,0.8)" />
-                                        <Text style={styles.leaveTimeText}>Leave by 10:45 AM</Text>
-                                    </View>
-                                </View>
-                            </GlassView>
+                <Animated.View entering={FadeInDown.duration(400).delay(100)} style={styles.searchBar}>
+                    <Ionicons name="search" size={18} color={Colors.textMuted} />
+                    <TextInput
+                        placeholder="Search doctors, clinics, specialties..."
+                        placeholderTextColor={Colors.textMuted}
+                        style={styles.searchInput}
+                        value={searchQuery}
+                        onChangeText={setSearchQuery}
+                        returnKeyType="search"
+                        onFocus={() => router.push('/(tabs)/search')}
+                    />
+                    {searchQuery.length > 0 ? (
+                        <Pressable onPress={() => setSearchQuery('')}>
+                            <Ionicons name="close-circle" size={18} color={Colors.textMuted} />
                         </Pressable>
                     ) : (
-                        // Smart Recommendation Card (No Token State)
-                        <Link href="/clinic/1" asChild>
-                            <Pressable>
-                                <GlassView style={styles.smartCard} gradientColors={['#fff', '#F8FAFC']}>
-                                    <View style={styles.smartContent}>
-                                        <View style={styles.smartHeader}>
-                                            <View style={styles.recommendationBadge}>
-                                                <Ionicons name="flash" size={12} color={Colors.primary} />
-                                                <Text style={styles.recommendationText}>Fastest Near You</Text>
-                                            </View>
-                                            <Text style={styles.smartDistance}>1.2 km</Text>
-                                        </View>
-
-                                        <Text style={styles.smartTitle}>Jay Dental Clinic</Text>
-                                        <Text style={styles.smartDoctor}>Dr. John Doe • Dentist</Text>
-
-                                        <View style={styles.smartFooter}>
-                                            <View style={styles.smartStat}>
-                                                <Ionicons name="time-outline" size={14} color={Colors.success} />
-                                                <Text style={styles.smartStatText}>~10m wait</Text>
-                                            </View>
-                                            <View style={styles.dot} />
-                                            <View style={styles.smartStat}>
-                                                <Ionicons name="star" size={14} color={Colors.smartAmber} />
-                                                <Text style={styles.smartStatText}>4.8</Text>
-                                            </View>
-                                        </View>
-                                    </View>
-                                    <Image
-                                        source={{ uri: 'https://images.unsplash.com/photo-1629909613654-28e377c37b09?w=800&auto=format&fit=crop&q=60' }}
-                                        style={styles.smartImage}
-                                    />
-                                </GlassView>
-                            </Pressable>
-                        </Link>
+                        <Pressable
+                            style={styles.filterPill}
+                            onPress={() => router.push('/(tabs)/search')}
+                        >
+                            <Ionicons name="options-outline" size={16} color={Colors.primary} />
+                            <Text style={styles.filterPillText}>Filter</Text>
+                        </Pressable>
                     )}
                 </Animated.View>
 
-                {/* 3. Search Bar */}
-                <Animated.View entering={FadeInDown.duration(600).delay(300)} style={styles.searchSection}>
-                    <GlassView style={styles.searchBar} intensity={20} border={false}>
-                        <Ionicons name="search" size={20} color={Colors.textMuted} style={{ marginLeft: 4 }} />
-                        <TextInput
-                            placeholder="Search doctors, clinics, services..."
-                            placeholderTextColor={Colors.textSecondary}
-                            style={styles.searchInput}
-                        />
-                        <View style={styles.filterSeparator} />
-                        <Pressable style={styles.filterBtn}>
-                            <Ionicons name="options-outline" size={20} color={Colors.primary} />
+                {/* ══ LIVE TOKEN CARD (when booked) ════════════════════════════ */}
+                {activeBooking && (
+                    <Animated.View entering={FadeInDown.duration(400).delay(120)}>
+                        <Pressable onPress={() => router.push('/(tabs)/token')}>
+                            <LinearGradient
+                                colors={Colors.gradients.hero}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 1 }}
+                                style={styles.activeTokenCard}
+                            >
+                                <View style={styles.activeTokenLeft}>
+                                    <View style={styles.activeLiveRow}>
+                                        <LiveDot color="rgba(255,255,255,0.9)" />
+                                        <Text style={styles.activeLiveText}>Live Token</Text>
+                                    </View>
+                                    <Text style={styles.activeDoctorName}>{activeBooking.doctorName}</Text>
+                                    <Text style={styles.activeClinicName}>{activeBooking.clinicName}</Text>
+                                    <View style={styles.activeLeaveRow}>
+                                        <Ionicons name="walk-outline" size={12} color="rgba(255,255,255,0.8)" />
+                                        <Text style={styles.activeLeaveText}>Leave by 10:45 AM</Text>
+                                    </View>
+                                </View>
+
+                                <View style={styles.activeTokenRight}>
+                                    <Text style={styles.activeTokenMeta}>YOUR TOKEN</Text>
+                                    <Text style={styles.activeTokenNumber}>{activeBooking.tokenNumber}</Text>
+                                    <Text style={styles.activeServingText}>
+                                        Serving #{activeBooking.servingToken}
+                                    </Text>
+                                </View>
+                            </LinearGradient>
                         </Pressable>
-                    </GlassView>
+                    </Animated.View>
+                )}
+
+                {/* ══ AREA LIVE STATUS (pre-booking) ═══════════════════════════ */}
+                {!activeBooking && (
+                    <Animated.View entering={FadeInDown.duration(400).delay(140)} style={styles.areaPanel}>
+                        {/* Left: Shortest wait */}
+                        <View style={styles.areaPanelLeft}>
+                            <Text style={styles.areaPanelCategory}>Shortest Wait</Text>
+                            <View style={styles.areaBigNumRow}>
+                                <Text style={styles.areaBigNum}>{shortestWait}</Text>
+                                <Text style={styles.areaBigNumUnit}>min</Text>
+                            </View>
+                            <Text style={styles.areaPanelSublabel}>Near You · Now</Text>
+                        </View>
+
+                        {/* 1px divider */}
+                        <View style={styles.areaPanelDivider} />
+
+                        {/* Right: Avg wait + open clinics */}
+                        <View style={styles.areaPanelRight}>
+                            <Text style={styles.areaPanelCategory}>Area Average</Text>
+                            <Text style={styles.areaAvgNum}>{avgWait} min</Text>
+                            <View style={styles.openClinicsPill}>
+                                <Text style={styles.openClinicsText}>
+                                    {CLINICS.length} clinics open
+                                </Text>
+                            </View>
+                        </View>
+
+                        {/* Full-width bottom strip */}
+                        <View style={styles.areaPanelStrip}>
+                            <View style={styles.areaPanelStripLeft}>
+                                <LiveDot color={Colors.success} />
+                                <Text style={styles.areaPanelStripText}>Live data · Updated just now</Text>
+                            </View>
+                            <Pressable onPress={() => router.push('/(tabs)/search')}>
+                                <Text style={styles.areaPanelStripLink}>See all →</Text>
+                            </Pressable>
+                        </View>
+                    </Animated.View>
+                )}
+
+                {/* ══ EMERGENCY STRIP ══════════════════════════════════════════ */}
+                <Animated.View entering={FadeInDown.duration(400).delay(180)}>
+                    <Pressable
+                        style={styles.emergencyStrip}
+                        onPress={() => router.push({ pathname: '/clinic/[id]', params: { id: '1', emergency: 'true' } })}
+                    >
+                        <View style={styles.emergencyLeft}>
+                            <View style={styles.emergencyIconWrap}>
+                                <Ionicons name="medical" size={13} color={Colors.medicalRed} />
+                            </View>
+                            <Text style={styles.emergencyText}>
+                                Need urgent help?{'  '}
+                                <Text style={{ fontFamily: 'Inter_700Bold' }}>Request Emergency Priority</Text>
+                            </Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={16} color={Colors.medicalRed} />
+                    </Pressable>
                 </Animated.View>
 
-                {/* 4. Categories */}
-                <Animated.View entering={FadeInDown.duration(600).delay(400)} style={styles.sectionHeader}>
+                {/* ══ SPECIALTIES ══════════════════════════════════════════════ */}
+                <Animated.View entering={FadeInDown.duration(400).delay(220)} style={styles.sectionHeader}>
                     <Text style={styles.sectionTitle}>Specialties</Text>
                 </Animated.View>
 
+                {/* Icon-only pills in a horizontal scroll */}
                 <Animated.ScrollView
                     horizontal
                     showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.categoryScroll}
-                    entering={FadeInDown.duration(600).delay(450)}
+                    contentContainerStyle={styles.catScroll}
+                    entering={FadeInDown.duration(400).delay(250)}
                 >
-                    {CATEGORIES.map((cat, index) => (
-                        <Pressable
-                            key={cat.id}
-                            style={[
-                                styles.categoryBtn,
-                                { backgroundColor: selectedCategory === cat.id ? Colors.primary : '#fff' },
-                            ]}
-                            onPress={() => setSelectedCategory(cat.id)}
-                        >
-                            <View style={[
-                                styles.catIconWrap,
-                                { backgroundColor: selectedCategory === cat.id ? 'rgba(255,255,255,0.2)' : cat.color }
-                            ]}>
-                                <Ionicons name={cat.icon as any} size={22} color={selectedCategory === cat.id ? '#fff' : cat.iconColor} />
-                            </View>
-                            <Text style={[
-                                styles.categoryLabel,
-                                selectedCategory === cat.id && styles.selectedCategoryLabel
-                            ]}>{cat.name}</Text>
-                        </Pressable>
-                    ))}
+                    {CATEGORIES.map((cat) => {
+                        const active = selectedCategory === cat.id;
+                        return (
+                            <Pressable
+                                key={cat.id}
+                                style={[
+                                    styles.catPill,
+                                    active
+                                        ? { backgroundColor: Colors.primary, borderColor: Colors.primary }
+                                        : { backgroundColor: Colors.surface, borderColor: Colors.border },
+                                ]}
+                                onPress={() => setSelectedCategory(cat.id)}
+                            >
+                                {/* Icon circle */}
+                                <View style={[
+                                    styles.catPillIconWrap,
+                                    { backgroundColor: active ? 'rgba(255,255,255,0.2)' : cat.color },
+                                ]}>
+                                    <Ionicons
+                                        name={cat.icon as any}
+                                        size={16}
+                                        color={active ? '#fff' : cat.iconColor}
+                                    />
+                                </View>
+                                <Text style={[
+                                    styles.catPillLabel,
+                                    { color: active ? '#fff' : Colors.textSecondary },
+                                ]}>
+                                    {cat.name}
+                                </Text>
+                            </Pressable>
+                        );
+                    })}
                 </Animated.ScrollView>
 
-                {/* 5. Nearest Clinics */}
-                <View style={styles.listSection}>
-                    <View style={styles.sectionHeader}>
-                        <Text style={styles.sectionTitle}>Nearby Clinics</Text>
-                        <Pressable onPress={() => router.push('/clinics')}>
-                            <Text style={styles.seeAll}>See All</Text>
-                        </Pressable>
-                    </View>
+                {/* ══ NEARBY CLINICS ═══════════════════════════════════════════ */}
+                <View style={styles.sectionHeader}>
+                    <Text style={styles.sectionTitle}>Nearby Clinics</Text>
+                    <Pressable onPress={() => router.push('/(tabs)/search')}>
+                        <Text style={styles.seeAll}>See All</Text>
+                    </Pressable>
+                </View>
 
-                    <View style={styles.clinicsList}>
-                        {filteredClinics.map((clinic, index) => (
-                            <Animated.View
-                                key={clinic.id}
-                                entering={FadeInDown.duration(600).delay(500 + index * 100)}
-                            >
-                                <Link href={`/clinic/${clinic.id}`} asChild>
-                                    <Pressable>
-                                        <GlassView style={styles.clinicCard} border intensity={0} gradientColors={['#fff', '#fff']}>
-                                            <Image source={{ uri: clinic.image }} style={styles.clinicImage} />
-                                            <View style={styles.clinicContent}>
-                                                <View style={styles.clinicHeader}>
-                                                    <View style={{ flex: 1 }}>
-                                                        <Text style={styles.clinicName}>{clinic.name}</Text>
-                                                        <Text style={styles.doctorName}>{clinic.doctor}</Text>
-                                                    </View>
-                                                    <StatusBadge
-                                                        status={getStatus(clinic.waitTimeMin) as any}
-                                                        text={getWaitLabel(clinic.waitTimeMin)}
-                                                    />
-                                                </View>
-
-                                                <View style={styles.clinicDetails}>
-                                                    <Text style={styles.detailText}>{clinic.specialty}</Text>
-                                                    <View style={styles.detailDot} />
-                                                    <Ionicons name="star" size={12} color={Colors.smartAmber} />
-                                                    <Text style={styles.detailText}>{clinic.rating}</Text>
-                                                    <View style={styles.detailDot} />
-                                                    <Text style={styles.detailText}>{clinic.distance}</Text>
-                                                </View>
-                                            </View>
-                                        </GlassView>
-                                    </Pressable>
-                                </Link>
-                            </Animated.View>
+                {filteredClinics.length > 0 ? (
+                    <View style={styles.clinicList}>
+                        {filteredClinics.map((clinic, i) => (
+                            <ClinicCard key={clinic.id} clinic={clinic} index={i} />
                         ))}
                     </View>
-                </View>
-                {/* Location Selection Modal */}
-                <Modal
-                    visible={showLocationModal}
-                    transparent={true}
-                    animationType="fade"
-                    onRequestClose={() => setShowLocationModal(false)}
-                >
-                    <Pressable
-                        style={styles.modalOverlay}
-                        onPress={() => setShowLocationModal(false)}
-                    >
-                        <Animated.View
-                            entering={FadeInDown.springify().damping(15)}
-                            style={styles.modalContent}
-                        >
-                            <View style={styles.modalHeader}>
-                                <Text style={styles.modalTitle}>Select Location</Text>
-                                <Pressable onPress={() => setShowLocationModal(false)}>
-                                    <Ionicons name="close" size={24} color={Colors.textMuted} />
-                                </Pressable>
-                            </View>
-                            <View style={styles.locationsList}>
-                                {LOCATIONS.map((loc) => (
-                                    <Pressable
-                                        key={loc}
-                                        style={[
-                                            styles.locationOption,
-                                            selectedLocation === loc && styles.selectedLocationOption
-                                        ]}
-                                        onPress={() => {
-                                            setSelectedLocation(loc);
-                                            setShowLocationModal(false);
-                                        }}
-                                    >
-                                        <Ionicons
-                                            name={selectedLocation === loc ? "location" : "location-outline"}
-                                            size={20}
-                                            color={selectedLocation === loc ? Colors.primary : Colors.textMuted}
-                                        />
-                                        <Text style={[
-                                            styles.locationOptionText,
-                                            selectedLocation === loc && styles.selectedLocationOptionText
-                                        ]}>{loc}</Text>
-                                        {selectedLocation === loc && (
-                                            <Ionicons name="checkmark" size={20} color={Colors.primary} style={{ marginLeft: 'auto' }} />
-                                        )}
-                                    </Pressable>
-                                ))}
-                            </View>
-                        </Animated.View>
-                    </Pressable>
-                </Modal>
+                ) : (
+                    <Animated.View entering={FadeInDown.duration(300)} style={styles.emptyState}>
+                        <View style={styles.emptyIconWrap}>
+                            <Ionicons name="search-outline" size={28} color={Colors.primary} />
+                        </View>
+                        <Text style={styles.emptyTitle}>No clinics found</Text>
+                        <Text style={styles.emptyText}>Try a different specialty or search term.</Text>
+                    </Animated.View>
+                )}
+
             </ScrollView>
+
+            {/* ══ LOCATION MODAL ═══════════════════════════════════════════ */}
+            <Modal
+                visible={showLocationModal}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setShowLocationModal(false)}
+            >
+                <Pressable style={styles.modalOverlay} onPress={() => setShowLocationModal(false)}>
+                    <Animated.View
+                        entering={FadeInDown.springify().damping(18)}
+                        style={styles.modalSheet}
+                    >
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Select Location</Text>
+                            <Pressable onPress={() => setShowLocationModal(false)}>
+                                <Ionicons name="close" size={22} color={Colors.textMuted} />
+                            </Pressable>
+                        </View>
+                        {LOCATIONS.map((loc) => {
+                            const active = selectedLocation === loc;
+                            return (
+                                <Pressable
+                                    key={loc}
+                                    style={[styles.modalOption, active && styles.modalOptionActive]}
+                                    onPress={() => { setSelectedLocation(loc); setShowLocationModal(false); }}
+                                >
+                                    <Ionicons
+                                        name={active ? 'location' : 'location-outline'}
+                                        size={18}
+                                        color={active ? Colors.primary : Colors.textMuted}
+                                    />
+                                    <Text style={[styles.modalOptionText, active && styles.modalOptionTextActive]}>
+                                        {loc}
+                                    </Text>
+                                    {active && (
+                                        <Ionicons name="checkmark" size={18} color={Colors.primary} style={{ marginLeft: 'auto' }} />
+                                    )}
+                                </Pressable>
+                            );
+                        })}
+                    </Animated.View>
+                </Pressable>
+            </Modal>
         </View>
     );
 }
 
+// ─────────────────────────────────────────────────────────────────
+// Styles
+// ─────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: Colors.background,
-        overflow: 'hidden', // Prevent horizontal scroll from decorative elements
     },
-    // ... existing styles ...
+    scroll: {
+        paddingHorizontal: 20,
+    },
+
+    // ── Top Bar ─────────────────────────────────────────────────────
+    topBar: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 18,
+    },
+    locationBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+    },
+    locationIconWrap: {
+        width: 32,
+        height: 32,
+        borderRadius: 9,
+        backgroundColor: Colors.primaryBg,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    locationMeta: {
+        fontFamily: 'Inter_500Medium',
+        fontSize: 10,
+        color: Colors.textMuted,
+        textTransform: 'uppercase',
+        letterSpacing: 0.4,
+    },
+    locationCity: {
+        fontFamily: 'Inter_700Bold',
+        fontSize: 14,
+        color: Colors.text,
+    },
+    topActions: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+    },
+    iconBtn: {
+        width: 38,
+        height: 38,
+        borderRadius: 12,
+        backgroundColor: Colors.surface,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: Colors.border,
+    },
+    notifDot: {
+        position: 'absolute',
+        top: 9,
+        right: 9,
+        width: 7,
+        height: 7,
+        borderRadius: 3.5,
+        backgroundColor: Colors.medicalRed,
+        borderWidth: 1.5,
+        borderColor: Colors.surface,
+    },
+    avatar: {
+        width: 38,
+        height: 38,
+        borderRadius: 12,
+        borderWidth: 2,
+        borderColor: Colors.primaryBg,
+    },
+
+    // ── Greeting ────────────────────────────────────────────────────
+    greetRow: {
+        marginBottom: 14,
+    },
+    greetText: {
+        fontFamily: 'Inter_700Bold',
+        fontSize: 24,
+        color: Colors.text,
+        letterSpacing: -0.4,
+    },
+    greetSubtext: {
+        fontFamily: 'Inter_400Regular',
+        fontSize: 13,
+        color: Colors.textSecondary,
+        marginTop: 2,
+    },
+
+    // ── Search Bar ──────────────────────────────────────────────────
+    searchBar: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: Colors.surface,
+        borderRadius: 16,
+        paddingHorizontal: 14,
+        paddingVertical: 11,
+        gap: 10,
+        borderWidth: 1.5,
+        borderColor: Colors.border,
+        marginBottom: 16,
+        ...Colors.shadows.sm,
+    },
+    searchInput: {
+        flex: 1,
+        fontFamily: 'Inter_500Medium',
+        fontSize: 14,
+        color: Colors.text,
+    },
+    filterPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        backgroundColor: Colors.primaryBg,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 10,
+    },
+    filterPillText: {
+        fontFamily: 'Inter_600SemiBold',
+        fontSize: 12,
+        color: Colors.primary,
+    },
+
+    // ── Active Token Card ───────────────────────────────────────────
+    activeTokenCard: {
+        borderRadius: 24,
+        padding: 20,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 16,
+    },
+    activeTokenLeft: {
+        flex: 1,
+        gap: 4,
+    },
+    activeLiveRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        marginBottom: 4,
+    },
+    activeLiveText: {
+        fontFamily: 'Inter_600SemiBold',
+        fontSize: 11,
+        color: 'rgba(255,255,255,0.8)',
+        textTransform: 'uppercase',
+        letterSpacing: 0.8,
+    },
+    activeDoctorName: {
+        fontFamily: 'Inter_700Bold',
+        fontSize: 18,
+        color: '#fff',
+        letterSpacing: -0.3,
+    },
+    activeClinicName: {
+        fontFamily: 'Inter_500Medium',
+        fontSize: 13,
+        color: 'rgba(255,255,255,0.75)',
+        marginBottom: 8,
+    },
+    activeLeaveRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+    },
+    activeLeaveText: {
+        fontFamily: 'Inter_500Medium',
+        fontSize: 12,
+        color: 'rgba(255,255,255,0.8)',
+    },
+    activeTokenRight: {
+        alignItems: 'center',
+        backgroundColor: 'rgba(255,255,255,0.15)',
+        borderRadius: 16,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        minWidth: 80,
+        gap: 2,
+    },
+    activeTokenMeta: {
+        fontFamily: 'Inter_700Bold',
+        fontSize: 8,
+        color: 'rgba(255,255,255,0.65)',
+        letterSpacing: 1.2,
+        textTransform: 'uppercase',
+    },
+    activeTokenNumber: {
+        fontFamily: 'Inter_700Bold',
+        fontSize: 36,
+        color: '#fff',
+        letterSpacing: -1,
+        lineHeight: 40,
+    },
+    activeServingText: {
+        fontFamily: 'Inter_500Medium',
+        fontSize: 11,
+        color: 'rgba(255,255,255,0.7)',
+    },
+
+    // ── Area Live Status Panel ──────────────────────────────────────
+    areaPanel: {
+        backgroundColor: Colors.surface,
+        borderRadius: 22,
+        borderWidth: 1,
+        borderColor: Colors.border,
+        flexWrap: 'wrap',
+        flexDirection: 'row',
+        overflow: 'hidden',
+        marginBottom: 16,
+        ...Colors.shadows.md,
+    },
+    areaPanelLeft: {
+        flex: 1,
+        padding: 18,
+        gap: 4,
+    },
+    areaPanelDivider: {
+        width: 1,
+        backgroundColor: Colors.border,
+        marginVertical: 14,
+    },
+    areaPanelRight: {
+        flex: 1,
+        padding: 18,
+        gap: 6,
+    },
+    areaPanelCategory: {
+        fontFamily: 'Inter_500Medium',
+        fontSize: 11,
+        color: Colors.textMuted,
+        letterSpacing: 0.2,
+    },
+    areaBigNumRow: {
+        flexDirection: 'row',
+        alignItems: 'baseline',
+        gap: 3,
+    },
+    areaBigNum: {
+        fontFamily: 'Inter_700Bold',
+        fontSize: 48,
+        color: Colors.text,
+        letterSpacing: -2,
+        lineHeight: 54,
+    },
+    areaBigNumUnit: {
+        fontFamily: 'Inter_600SemiBold',
+        fontSize: 16,
+        color: Colors.textSecondary,
+        marginBottom: 2,
+    },
+    areaPanelSublabel: {
+        fontFamily: 'Inter_600SemiBold',
+        fontSize: 12,
+        color: Colors.success,
+    },
+    areaAvgNum: {
+        fontFamily: 'Inter_700Bold',
+        fontSize: 22,
+        color: Colors.text,
+        letterSpacing: -0.5,
+    },
+    openClinicsPill: {
+        alignSelf: 'flex-start',
+        backgroundColor: Colors.primaryBg,
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 20,
+    },
+    openClinicsText: {
+        fontFamily: 'Inter_600SemiBold',
+        fontSize: 11,
+        color: Colors.primary,
+    },
+    areaPanelStrip: {
+        width: '100%',
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: 18,
+        paddingVertical: 10,
+        borderTopWidth: 1,
+        borderTopColor: Colors.borderLight,
+        backgroundColor: Colors.background,
+    },
+    areaPanelStripLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    areaPanelStripText: {
+        fontFamily: 'Inter_500Medium',
+        fontSize: 11,
+        color: Colors.textMuted,
+    },
+    areaPanelStripLink: {
+        fontFamily: 'Inter_600SemiBold',
+        fontSize: 12,
+        color: Colors.primary,
+    },
+
+    // ── Emergency Strip ─────────────────────────────────────────────
+    emergencyStrip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: Colors.dangerBg,
+        padding: 12,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: `${Colors.medicalRed}25`,
+        marginBottom: 24,
+    },
+    emergencyLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        flex: 1,
+    },
+    emergencyIconWrap: {
+        width: 28,
+        height: 28,
+        borderRadius: 9,
+        backgroundColor: `${Colors.medicalRed}18`,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    emergencyText: {
+        fontFamily: 'Inter_500Medium',
+        fontSize: 12,
+        color: Colors.medicalRed,
+        flex: 1,
+    },
+
+    // ── Specialties ─────────────────────────────────────────────────
+    catScroll: {
+        gap: 8,
+        paddingRight: 20,
+        paddingBottom: 20,
+    },
+    catPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 14,
+        gap: 7,
+        borderWidth: 1.5,
+    },
+    catPillIconWrap: {
+        width: 28,
+        height: 28,
+        borderRadius: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    catPillLabel: {
+        fontFamily: 'Inter_600SemiBold',
+        fontSize: 12,
+    },
+
+    // ── Section Header ──────────────────────────────────────────────
+    sectionHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 14,
+    },
+    sectionTitle: {
+        fontFamily: 'Inter_700Bold',
+        fontSize: 17,
+        color: Colors.text,
+    },
+    seeAll: {
+        fontFamily: 'Inter_600SemiBold',
+        fontSize: 13,
+        color: Colors.primary,
+    },
+
+    // ── Clinic Cards ────────────────────────────────────────────────
+    clinicList: {
+        gap: 12,
+    },
+    clinicCard: {
+        flexDirection: 'row',
+        backgroundColor: Colors.surface,
+        borderRadius: 18,
+        padding: 12,
+        borderWidth: 1,
+        borderColor: Colors.border,
+        alignItems: 'center',
+        ...Colors.shadows.sm,
+    },
+    clinicCardImage: {
+        width: 80,
+        height: 80,
+        borderRadius: 13,
+        backgroundColor: Colors.borderLight,
+    },
+    clinicCardBody: {
+        flex: 1,
+        marginLeft: 14,
+        justifyContent: 'space-between',
+        height: 80,
+    },
+    clinicCardName: {
+        fontFamily: 'Inter_600SemiBold',
+        fontSize: 15,
+        color: Colors.text,
+        letterSpacing: -0.2,
+        marginBottom: 3,
+    },
+    clinicCardDoctor: {
+        fontFamily: 'Inter_500Medium',
+        fontSize: 12,
+        color: Colors.textSecondary,
+    },
+    clinicCardFooter: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    clinicCardMeta: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+    },
+    clinicCardMetaText: {
+        fontFamily: 'Inter_500Medium',
+        fontSize: 11,
+        color: Colors.textMuted,
+    },
+    metaDot: {
+        width: 3,
+        height: 3,
+        borderRadius: 1.5,
+        backgroundColor: Colors.border,
+    },
+    waitBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+        paddingHorizontal: 9,
+        paddingVertical: 4,
+        borderRadius: 20,
+    },
+    waitBadgeText: {
+        fontFamily: 'Inter_700Bold',
+        fontSize: 12,
+    },
+
+    // ── Empty State ─────────────────────────────────────────────────
+    emptyState: {
+        alignItems: 'center',
+        paddingTop: 40,
+        gap: 10,
+    },
+    emptyIconWrap: {
+        width: 56,
+        height: 56,
+        borderRadius: 18,
+        backgroundColor: Colors.primaryBg,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 4,
+    },
+    emptyTitle: {
+        fontFamily: 'Inter_600SemiBold',
+        fontSize: 16,
+        color: Colors.text,
+    },
+    emptyText: {
+        fontFamily: 'Inter_400Regular',
+        fontSize: 13,
+        color: Colors.textMuted,
+    },
+
+    // ── Location Modal ──────────────────────────────────────────────
     modalOverlay: {
         flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.5)',
+        backgroundColor: 'rgba(26,26,46,0.5)',
         justifyContent: 'center',
         alignItems: 'center',
         padding: 20,
     },
-    modalContent: {
-        backgroundColor: '#fff',
+    modalSheet: {
+        backgroundColor: Colors.surface,
         borderRadius: 24,
         width: '100%',
-        maxWidth: 340,
+        maxWidth: 360,
         padding: 20,
+        gap: 6,
         ...Colors.shadows.lg,
     },
     modalHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 20,
+        marginBottom: 10,
     },
     modalTitle: {
         fontFamily: 'Inter_700Bold',
-        fontSize: 18,
+        fontSize: 17,
         color: Colors.text,
     },
-    locationsList: {
-        gap: 8,
-    },
-    locationOption: {
+    modalOption: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 12,
-        padding: 16,
-        borderRadius: 16,
+        padding: 13,
+        borderRadius: 14,
         backgroundColor: Colors.background,
     },
-    selectedLocationOption: {
-        backgroundColor: '#E0F2FE',
+    modalOptionActive: {
+        backgroundColor: Colors.primaryBg,
     },
-    locationOptionText: {
+    modalOptionText: {
         fontFamily: 'Inter_500Medium',
-        fontSize: 15,
+        fontSize: 14,
         color: Colors.text,
     },
-    selectedLocationOptionText: {
+    modalOptionTextActive: {
+        fontFamily: 'Inter_600SemiBold',
         color: Colors.primary,
-        fontFamily: 'Inter_600SemiBold',
-    },
-    topBg: {
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        height: 350,
-        backgroundColor: '#E0F2FE',
-    },
-    decorativeCircle: {
-        position: 'absolute',
-        width: 150,
-        height: 150,
-        borderRadius: 75,
-    },
-    scrollContent: {
-        paddingHorizontal: 20,
-    },
-
-    // Top Bar
-    topBar: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 20,
-    },
-    locationBtn: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 12,
-    },
-    locationIconBg: {
-        width: 36,
-        height: 36,
-        borderRadius: 12,
-        backgroundColor: '#fff',
-        alignItems: 'center',
-        justifyContent: 'center',
-        ...Colors.shadows.sm,
-    },
-    locationLabel: {
-        fontFamily: 'Inter_500Medium',
-        fontSize: 11,
-        color: Colors.textMuted,
-        textTransform: 'uppercase',
-    },
-    locationValue: {
-        fontFamily: 'Inter_700Bold',
-        fontSize: 15,
-        color: Colors.text,
-    },
-    topRightActions: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 12,
-    },
-    iconBtn: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: '#fff',
-        alignItems: 'center',
-        justifyContent: 'center',
-        ...Colors.shadows.sm,
-    },
-    notifBadge: {
-        position: 'absolute',
-        top: 10,
-        right: 10,
-        width: 8,
-        height: 8,
-        borderRadius: 4,
-        backgroundColor: Colors.medicalRed,
-        borderWidth: 1.5,
-        borderColor: '#fff',
-    },
-    avatar: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        borderWidth: 2,
-        borderColor: '#fff',
-    },
-
-    // Hero Section
-    heroSection: {
-        marginBottom: 24,
-    },
-    heroBanner: {
-        borderRadius: 24,
-        padding: 24,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        minHeight: 160,
-        ...Colors.shadows.md,
-    },
-    heroContent: {
-        flex: 1,
-        paddingRight: 10,
-    },
-    heroTitle: {
-        fontFamily: 'Inter_700Bold',
-        fontSize: 22,
-        color: Colors.text,
-        marginBottom: 8,
-        lineHeight: 30,
-    },
-    heroSub: {
-        fontFamily: 'Inter_500Medium',
-        fontSize: 14,
-        color: Colors.textSecondary,
-        marginBottom: 12,
-        lineHeight: 20,
-    },
-    heroImage: {
-        width: 100,
-        height: 100,
-    },
-
-    // Active Card
-    activeCard: {
-        borderRadius: 24,
-        padding: 20,
-        gap: 20,
-        ...Colors.shadows.glow,
-    },
-    activeCardHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'flex-start',
-    },
-    activeLabel: {
-        color: 'rgba(255,255,255,0.7)',
-        fontSize: 12,
-        fontFamily: 'Inter_600SemiBold',
-        marginBottom: 4,
-        textTransform: 'uppercase',
-        letterSpacing: 1,
-    },
-    activeDoctor: {
-        color: '#fff',
-        fontSize: 20,
-        fontFamily: 'Inter_700Bold',
-        marginBottom: 2,
-    },
-    activeClinic: {
-        color: 'rgba(255,255,255,0.8)',
-        fontSize: 14,
-        fontFamily: 'Inter_500Medium',
-    },
-    tokenContainer: {
-        alignItems: 'center',
-        backgroundColor: 'rgba(255,255,255,0.15)',
-        padding: 10,
-        borderRadius: 12,
-        minWidth: 60,
-    },
-    tokenLabel: {
-        color: 'rgba(255,255,255,0.7)',
-        fontSize: 10,
-        fontFamily: 'Inter_700Bold',
-        marginBottom: 0,
-    },
-    tokenNumber: {
-        color: '#fff',
-        fontSize: 24,
-        fontFamily: 'Inter_700Bold',
-    },
-    visualizerContainer: {
-        marginVertical: 4,
-    },
-    activeCardFooter: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingTop: 12,
-        borderTopWidth: 1,
-        borderTopColor: 'rgba(255,255,255,0.2)',
-    },
-    leaveTimeContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-    },
-    leaveTimeText: {
-        color: '#fff',
-        fontFamily: 'Inter_500Medium',
-        fontSize: 13,
-    },
-
-    // Search
-    searchSection: {
-        marginBottom: 24,
-    },
-    searchBar: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#fff',
-        paddingHorizontal: 16,
-        paddingVertical: 14,
-        borderRadius: 16,
-        ...Colors.shadows.md,
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.6)',
-    },
-    searchInput: {
-        flex: 1,
-        marginLeft: 10,
-        fontFamily: 'Inter_500Medium',
-        fontSize: 15,
-        color: Colors.text,
-    },
-    filterSeparator: {
-        width: 1,
-        height: 20,
-        backgroundColor: Colors.borderLight,
-        marginHorizontal: 12,
-    },
-    filterBtn: {
-        padding: 4,
-    },
-
-    // Categories
-    sectionHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 16,
-    },
-    sectionTitle: {
-        fontFamily: 'Inter_700Bold',
-        fontSize: 18,
-        color: Colors.text,
-    },
-    seeAll: {
-        fontFamily: 'Inter_600SemiBold',
-        fontSize: 14,
-        color: Colors.primary,
-    },
-    categoryScroll: {
-        paddingRight: 20,
-        gap: 12,
-        paddingBottom: 24,
-    },
-    categoryBtn: {
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        borderRadius: 16,
-        alignItems: 'center',
-        flexDirection: 'row',
-        gap: 10,
-        ...Colors.shadows.sm,
-    },
-    catIconWrap: {
-        width: 36,
-        height: 36,
-        borderRadius: 10,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    categoryLabel: {
-        fontFamily: 'Inter_600SemiBold',
-        fontSize: 14,
-        color: Colors.text,
-    },
-    selectedCategoryLabel: {
-        color: '#fff',
-    },
-
-    // Nearby List
-    listSection: {
-        marginBottom: 20,
-    },
-    clinicsList: {
-        gap: 16,
-    },
-    clinicCard: {
-        borderRadius: 20,
-        padding: 12,
-        ...Colors.shadows.sm,
-        flexDirection: 'row',
-        backgroundColor: '#fff',
-    },
-    clinicImage: {
-        width: 90,
-        height: 90,
-        borderRadius: 14,
-        backgroundColor: Colors.borderLight,
-    },
-    clinicContent: {
-        flex: 1,
-        marginLeft: 14,
-        justifyContent: 'space-between',
-        paddingVertical: 2,
-    },
-    clinicHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'flex-start',
-    },
-    clinicName: {
-        fontFamily: 'Inter_600SemiBold',
-        fontSize: 16,
-        color: Colors.text,
-        marginBottom: 2,
-    },
-    doctorName: {
-        fontFamily: 'Inter_500Medium',
-        fontSize: 13,
-        color: Colors.textSecondary,
-        marginBottom: 8,
-    },
-    clinicDetails: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    detailText: {
-        fontFamily: 'Inter_500Medium',
-        fontSize: 12,
-        color: Colors.textMuted,
-    },
-    detailDot: {
-        width: 3,
-        height: 3,
-        borderRadius: 1.5,
-        backgroundColor: Colors.textMuted,
-        marginHorizontal: 6,
-    },
-    // Emergency Strip
-    emergencyStrip: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        backgroundColor: '#FEF2F2',
-        padding: 12,
-        borderRadius: 16,
-        borderWidth: 1,
-        borderColor: '#FECACA',
-    },
-    emergencyContent: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 10,
-    },
-    emergencyIconBg: {
-        width: 28,
-        height: 28,
-        borderRadius: 10,
-        backgroundColor: '#FFE4E6',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    emergencyText: {
-        fontSize: 13,
-        color: Colors.medicalRed,
-        fontFamily: 'Inter_500Medium',
-    },
-
-    // Smart Suggestion Card
-    smartCard: {
-        flexDirection: 'row',
-        padding: 16,
-        borderRadius: 24,
-        ...Colors.shadows.md,
-        alignItems: 'center',
-        backgroundColor: '#fff',
-    },
-    smartContent: {
-        flex: 1,
-        paddingRight: 10,
-        gap: 4,
-    },
-    smartHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        marginBottom: 4,
-    },
-    recommendationBadge: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-        backgroundColor: '#E0F2FE',
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 8,
-    },
-    recommendationText: {
-        fontSize: 11,
-        color: Colors.primary,
-        fontFamily: 'Inter_600SemiBold',
-    },
-    smartDistance: {
-        fontSize: 12,
-        color: Colors.textSecondary,
-        fontFamily: 'Inter_500Medium',
-    },
-    smartTitle: {
-        fontSize: 18,
-        color: Colors.text,
-        fontFamily: 'Inter_700Bold',
-    },
-    smartDoctor: {
-        fontSize: 13,
-        color: Colors.textSecondary,
-        fontFamily: 'Inter_500Medium',
-        marginBottom: 4,
-    },
-    smartFooter: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-        marginTop: 4,
-    },
-    smartStat: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-    },
-    smartStatText: {
-        fontSize: 13,
-        fontFamily: 'Inter_600SemiBold',
-        color: Colors.text,
-    },
-    dot: {
-        width: 3,
-        height: 3,
-        borderRadius: 1.5,
-        backgroundColor: Colors.borderLight,
-    },
-    smartImage: {
-        width: 80,
-        height: 80,
-        borderRadius: 16,
-        backgroundColor: Colors.borderLight,
     },
 });

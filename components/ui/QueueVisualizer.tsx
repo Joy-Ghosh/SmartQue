@@ -42,7 +42,7 @@ export function QueueVisualizer({ total, serving, userToken, estimatedWait, comp
         return (
             <View style={styles.minimalContainer}>
                 <View style={styles.track}>
-                    <View style={{ ...StyleSheet.absoluteFillObject, backgroundColor: '#E2E8F0', borderRadius: 4 }} />
+                    <View style={{ ...StyleSheet.absoluteFillObject, backgroundColor: Colors.borderLight, borderRadius: 4 }} />
                     <Animated.View style={[styles.fill, animatedStyle, { backgroundColor: Colors.primary }]} />
                 </View>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
@@ -124,11 +124,11 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        backgroundColor: 'rgba(255,255,255,0.6)',
+        backgroundColor: Colors.background,
         borderRadius: 12,
         padding: 12,
         borderWidth: 1,
-        borderColor: '#f0f0f0',
+        borderColor: Colors.border,
     },
     metricItem: {
         alignItems: 'center',
@@ -137,7 +137,7 @@ const styles = StyleSheet.create({
     metricDivider: {
         width: 1,
         height: 24,
-        backgroundColor: '#E2E8F0',
+        backgroundColor: Colors.border,
     },
     metricLabel: {
         fontSize: 11,
@@ -156,7 +156,7 @@ const styles = StyleSheet.create({
     },
     track: {
         height: 6,
-        backgroundColor: '#E2E8F0',
+        backgroundColor: Colors.borderLight,
         borderRadius: 4,
         overflow: 'hidden',
         position: 'relative',

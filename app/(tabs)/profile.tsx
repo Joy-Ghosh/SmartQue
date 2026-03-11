@@ -53,12 +53,7 @@ export default function ProfileScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Background Gradient */}
-      <View style={styles.headerBg}>
-        <LinearGradient colors={['#F0F9FF', '#F8FAFC']} style={StyleSheet.absoluteFill} />
-        <View style={styles.blob1} />
-        <View style={styles.blob2} />
-      </View>
+      <View style={styles.headerBg} />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -73,14 +68,13 @@ export default function ProfileScreen() {
         <GlassView style={styles.profileCard} intensity={70} gradientColors={['rgba(255,255,255,0.8)', 'rgba(255,255,255,0.95)']} border>
           <View style={styles.headerTop}>
             <View style={styles.avatarContainer}>
-              <LinearGradient
-                colors={Colors.gradients.primary}
-                style={styles.avatarGradient}
+              <View
+                style={[styles.avatarGradient, { backgroundColor: Colors.text }]}
               >
                 <Text style={styles.avatarText}>
                   {user.name.split(' ').map((n) => n[0]).join('')}
                 </Text>
-              </LinearGradient>
+              </View>
               <Pressable style={styles.editBadge}>
                 <Ionicons name="pencil" size={12} color="#fff" />
               </Pressable>
@@ -366,7 +360,7 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   elaborationBtn: {
-    backgroundColor: Colors.primary,
+    backgroundColor: Colors.accent,
     paddingVertical: 12,
     borderRadius: 12,
     flexDirection: 'row',
