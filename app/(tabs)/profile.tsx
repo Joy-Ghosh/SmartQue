@@ -146,7 +146,7 @@ export default function ProfileScreen() {
               icon="wallet-outline"
               label="Payment Methods"
               color={Colors.secondary}
-              onPress={() => { }}
+              onPress={() => router.push('/payment-methods')}
             />
           </GlassView>
         </View>

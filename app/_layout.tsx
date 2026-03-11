@@ -19,6 +19,7 @@ function RootLayoutNav() {
       <Stack.Screen name="clinic/[id]" options={{ headerShown: false }} />
       <Stack.Screen name="active-token" options={{ headerShown: false }} />
       <Stack.Screen name="appointments" options={{ headerShown: false }} />
+      <Stack.Screen name="payment-methods" options={{ headerShown: false, presentation: 'modal' }} />
     </Stack>
   );
 }
