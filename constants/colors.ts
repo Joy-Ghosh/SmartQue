@@ -1,51 +1,69 @@
 export const Colors = {
-  // ── Canvas ──────────────────────────────────────────────────────────────
-  background: '#F7F5F2',     // Warm off-white — feels paper-like, not clinical
-  surface: '#FFFFFF',        // Cards / sheets
+  // ── Primary Scale ────────────────────────────────────────────────────────
+  primary100: '#A7EBF2',
+  primary200: '#7FD4DE',
+  primary300: '#54ACBF',
+  primary400: '#3A87A6',
+  primary500: '#26658C',
+  primary600: '#1B4E73',
+  primary700: '#023859',
+  primary800: '#012A47',
+  primary900: '#011C40',
 
-  // ── Glass layers ────────────────────────────────────────────────────────
-  surfaceGlass: 'rgba(255, 255, 255, 0.80)',
-  surfaceGlassDark: 'rgba(30, 30, 40, 0.75)',
+  // ── Neutral Scale ────────────────────────────────────────────────────────
+  gray50: '#F8FAFC',
+  gray100: '#F1F5F9',
+  gray200: '#E2E8F0',
+  gray300: '#CBD5E1',
+  gray400: '#94A3B8',
+  gray500: '#64748B',
+  gray600: '#475569',
+  gray700: '#334155',
+  gray800: '#1E293B',
+  gray900: '#0F172A',
 
-  // ── Typography ──────────────────────────────────────────────────────────
-  text: '#1A1A2E',           // Deep navy-black — warmer than pure black
-  textSecondary: '#64748B',  // Slate-600
-  textMuted: '#94A3B8',      // Slate-400
+  // ── Semantic Colors ──────────────────────────────────────────────────────
+  success100: '#DCFCE7',
+  success500: '#22C55E',
+  success700: '#15803D',
+
+  warning100: '#FEF3C7',
+  warning500: '#F59E0B',
+  warning700: '#B45309',
+
+  error100: '#FEE2E2',
+  error500: '#EF4444',
+  error700: '#B91C1C',
+
+  // ── Surface System ───────────────────────────────────────────────────────
+  surfacePrimary: '#FFFFFF',
+  surfaceSecondary: '#F8FAFC',
+  surfaceTertiary: '#F1F5F9',
+  surfaceBrand: '#F0F7FA',
+
+  // ── Text Colors ──────────────────────────────────────────────────────────
+  textPrimary: '#0F172A',
+  textSecondary: '#475569',
+  textTertiary: '#94A3B8',
   textInverse: '#FFFFFF',
 
-  // ── Brand (Soft Indigo + Mint Teal) ─────────────────────────────────────
-  primary: '#5B6EF5',        // Soft indigo — not harsh, but confident
-  primaryLight: '#8B9BFF',
-  primaryDark: '#3A4ED9',
-  primaryBg: '#EEF0FF',      // Very light indigo tint
-
-  secondary: '#2EC4B6',      // Mint teal
-  secondaryLight: '#72D9CF',
-  secondaryDark: '#1A9E93',
-  secondaryBg: '#E6F9F8',
-
-  // ── Accent (single vivid CTA) ────────────────────────────────────────────
-  accent: '#5B6EF5',         // Same as primary — this IS the one CTA color
-
-  // ── Borders ─────────────────────────────────────────────────────────────
-  border: '#E8E4DF',
-  borderLight: '#F0EDE8',
-
-  // ── Status / Emotional triggers ──────────────────────────────────────────
-  medicalRed: '#F25C5C',     // Soft coral-red
-  danger: '#F25C5C',
-  dangerBg: '#FEF0F0',
-
-  success: '#34C48B',        // Mint green
-  successBg: '#E8F9F2',
-  confidenceGreen: '#34C48B',
-
-  smartAmber: '#F59E0B',     // Warm amber
-  warning: '#F59E0B',
+  // ── Legacy Aliases to prevent app breaking ───────────────────────────────
+  primary: '#26658C',
+  background: '#F8FAFC',
+  surface: '#FFFFFF',
+  text: '#0F172A',
+  textMuted: '#94A3B8',
+  border: '#E2E8F0',
+  borderLight: '#F1F5F9',
+  medicalRed: '#EF4444',
+  dangerBg: '#FEE2E2',
+  success: '#22C55E',
+  successBg: '#DCFCE7',
+  smartAmber: '#F59E0B',
   warningBg: '#FEF3C7',
+  primaryBg: '#F0F7FA',
 
-  waitingGrey: '#94A3B8',
-  infoBg: '#EEF0FF',
+  // ── Aliases / Expo Router theme tokens ───────────────────────────────────
 
   // ── Gradients ────────────────────────────────────────────────────────────
   gradients: {
@@ -94,28 +112,20 @@ export const Colors = {
     },
   },
 
-  // ── Status configs ──────────────────────────────────────────────────────
-  status: {
-    success: { bg: '#E8F9F2', text: '#1A9E73', dot: '#34C48B' },
-    warning: { bg: '#FEF3C7', text: '#B45309', dot: '#F59E0B' },
-    error:   { bg: '#FEF0F0', text: '#C0392B', dot: '#F25C5C' },
-    info:    { bg: '#EEF0FF', text: '#3A4ED9', dot: '#5B6EF5' },
-  },
-
-  // ── Expo Router theme tokens ─────────────────────────────────────────────
+  // Mapping Expo router requirements to our new tokens to prevent breaking
   light: {
-    text: '#1A1A2E',
-    background: '#F7F5F2',
-    tint: '#5B6EF5',
+    text: '#0F172A',
+    background: '#F8FAFC',
+    tint: '#26658C',
     tabIconDefault: '#94A3B8',
-    tabIconSelected: '#5B6EF5',
+    tabIconSelected: '#26658C',
   },
   dark: {
-    text: '#F7F5F2',
-    background: '#1A1A2E',
-    tint: '#5B6EF5',
-    tabIconDefault: '#64748B',
-    tabIconSelected: '#5B6EF5',
+    text: '#FFFFFF',
+    background: '#0F172A',
+    tint: '#26658C',
+    tabIconDefault: '#475569',
+    tabIconSelected: '#26658C',
   },
 };
 

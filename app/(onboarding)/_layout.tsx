@@ -3,7 +3,7 @@ import React from 'react';
 
 export default function OnboardingLayout() {
     return (
-        <Stack screenOptions={{ headerShown: false }}>
+        <Stack screenOptions={{ headerShown: false, contentStyle: { flex: 1 } }}>
             <Stack.Screen name="index" />
             <Stack.Screen name="walkthrough" />
             <Stack.Screen name="login" />

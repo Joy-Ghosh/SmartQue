@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { Platform, StyleSheet, View } from 'react-native';
+import { Platform, StyleSheet, View, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import Colors from '@/constants/colors';
@@ -18,40 +18,36 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarShowLabel: true,
-        tabBarActiveTintColor: Colors.primary,
-        tabBarInactiveTintColor: Colors.textMuted,
+        tabBarShowLabel: false, // Custom labeling entirely handled inside the icon component
         tabBarStyle: {
           position: 'absolute',
           bottom: 0,
           left: 0,
           right: 0,
           height: isIOS ? 88 : 68,
-          backgroundColor: 'rgba(255, 249, 245, 0.95)',
+          backgroundColor: Colors.surfacePrimary,
           borderTopWidth: 1,
-          borderTopColor: Colors.border,
-          elevation: 0,
-          shadowColor: Colors.shadows.lg.shadowColor,
-          shadowOffset: { width: 0, height: -4 },
-          shadowOpacity: 0.08,
+          borderTopColor: Colors.gray200,
+          elevation: 10,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -3 },
+          shadowOpacity: 0.05,
           shadowRadius: 12,
-          paddingTop: 8,
-        },
-        tabBarLabelStyle: {
-          fontFamily: 'Inter_600SemiBold',
-          fontSize: 10,
-          marginTop: 2,
-          marginBottom: isIOS ? 0 : 6,
+          paddingTop: isIOS ? 12 : 0, 
         },
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Home',
-          tabBarIcon: ({ color, focused }) => (
-            <View style={[styles.tabIconContainer, focused && styles.activeTabPopup]}>
-              <Ionicons name={focused ? "home" : "home-outline"} size={22} color={color} />
+          tabBarIcon: ({ focused }) => (
+            <View style={[styles.tabItem, focused && styles.tabItemActive]}>
+              <Ionicons 
+                name={focused ? "home" : "home-outline"} 
+                size={22} 
+                color={focused ? Colors.primary500 : Colors.gray500} 
+              />
+              {focused && <Text style={styles.tabTextActive}>Home</Text>}
             </View>
           ),
         }}
@@ -60,10 +56,14 @@ export default function TabLayout() {
       <Tabs.Screen
         name="search"
         options={{
-          title: 'Explore',
-          tabBarIcon: ({ color, focused }) => (
-            <View style={[styles.tabIconContainer, focused && styles.activeTabPopup]}>
-              <Ionicons name={focused ? "compass" : "compass-outline"} size={22} color={color} />
+          tabBarIcon: ({ focused }) => (
+            <View style={[styles.tabItem, focused && styles.tabItemActive]}>
+              <Ionicons 
+                name={focused ? "search" : "search-outline"} 
+                size={22} 
+                color={focused ? Colors.primary500 : Colors.gray500} 
+              />
+              {focused && <Text style={styles.tabTextActive}>Clinics</Text>}
             </View>
           ),
         }}
@@ -73,10 +73,14 @@ export default function TabLayout() {
       <Tabs.Screen
         name="token"
         options={{
-          title: 'Token',
-          tabBarIcon: ({ color, focused }) => (
-            <View style={[styles.tabIconContainer, focused && styles.activeTabPopup]}>
-              <Ionicons name={focused ? "ticket" : "ticket-outline"} size={22} color={color} />
+          tabBarIcon: ({ focused }) => (
+            <View style={[styles.tabItem, focused && styles.tabItemActive]}>
+              <Ionicons 
+                name={focused ? "ticket" : "ticket-outline"} 
+                size={22} 
+                color={focused ? Colors.primary500 : Colors.gray500} 
+              />
+              {focused && <Text style={styles.tabTextActive}>My Queue</Text>}
             </View>
           ),
         }}
@@ -86,23 +90,22 @@ export default function TabLayout() {
       <Tabs.Screen
         name="appointments"
         options={{
-          title: 'Visits',
-          tabBarIcon: ({ color, focused }) => (
-            <View style={[styles.tabIconContainer, focused && styles.activeTabPopup]}>
-              <Ionicons name={focused ? "calendar" : "calendar-outline"} size={22} color={color} />
-            </View>
-          )
+           // Hide appointments from the bottom nav specifically based on user request "Home, Clinics, My Queue, Profile"
+           href: null as any,
         }}
-        listeners={{ tabPress: handleTabPress }}
       />
 
       <Tabs.Screen
         name="profile"
         options={{
-          title: 'Profile',
-          tabBarIcon: ({ color, focused }) => (
-            <View style={[styles.tabIconContainer, focused && styles.activeTabPopup]}>
-              <Ionicons name={focused ? "person" : "person-outline"} size={22} color={color} />
+          tabBarIcon: ({ focused }) => (
+            <View style={[styles.tabItem, focused && styles.tabItemActive]}>
+              <Ionicons 
+                name={focused ? "person" : "person-outline"} 
+                size={22} 
+                color={focused ? Colors.primary500 : Colors.gray500} 
+              />
+              {focused && <Text style={styles.tabTextActive}>Profile</Text>}
             </View>
           ),
         }}
@@ -113,14 +116,27 @@ export default function TabLayout() {
 }
 
 const styles = StyleSheet.create({
-  tabIconContainer: {
+  tabItem: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    width: 40,
-    height: 32,
-    borderRadius: 16,
+    // Equal square-ish dimension when inactive to ensure centering
+    height: 44,
+    minWidth: 44,
+    borderRadius: 100,
+    gap: 6,
+    paddingHorizontal: 0,
   },
-  activeTabPopup: {
-    backgroundColor: Colors.primaryBg,
+  tabItemActive: {
+    backgroundColor: Colors.primary100, // Soft blue pill
+    paddingHorizontal: 16, // Expands pill beautifully
+    minWidth: 'auto',
+  },
+  tabTextActive: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 13,
+    color: Colors.primary500,
+    marginBottom: Platform.OS === 'ios' ? 0 : 2, // Slight vertical balancing
   }
 });
+

@@ -12,8 +12,8 @@ import { useFonts, Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_7
 SplashScreen.preventAutoHideAsync();
 
 function RootLayoutNav() {
-  return (
-    <Stack screenOptions={{ headerBackTitle: 'Back' }}>
+  return (5
+    <Stack screenOptions={{ headerBackTitle: 'Back', contentStyle: { flex: 1 } }}>
       <Stack.Screen name="(onboarding)" options={{ headerShown: false }} />
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="clinic/[id]" options={{ headerShown: false }} />

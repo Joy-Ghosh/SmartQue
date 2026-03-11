@@ -8,19 +8,26 @@ export const Layout = {
     },
     grid: {
         columns: 4,
-        margin: 20,
-        gutter: 20,
+        margin: 16,
+        gutter: 16,
+    },
+    spacing: {
+        space1: 4,
+        space2: 8,
+        space3: 12,
+        space4: 16,
+        space5: 20,
+        space6: 24,
+        space8: 32,
+        space10: 40,
+        space12: 48,
+        space16: 64,
     },
 };
 
 /**
  * Calculates the width of a column span based on the current screen width
  * and grid settings.
- * 
- * Formula: 
- * Total Usable Width = ScreenWidth - (2 * Margin)
- * Column Width = (Total Usable Width - ((Columns - 1) * Gutter)) / Columns
- * Span Width = (Column Width * Span) + ((Span - 1) * Gutter)
  */
 export const getColWidth = (span: number = 1): number => {
     const { width } = Dimensions.get('window');
