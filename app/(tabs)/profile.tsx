@@ -138,14 +138,14 @@ export default function ProfileScreen() {
             <MenuItem
               icon="heart-outline"
               label="Saved Clinics"
-              color={Colors.medicalRed}
+              color={Colors.error500}
               onPress={() => { }}
             />
             <View style={styles.menuDivider} />
             <MenuItem
               icon="wallet-outline"
               label="Payment Methods"
-              color={Colors.secondary}
+              color={Colors.primary300}
               onPress={() => router.push('/payment-methods')}
             />
           </GlassView>
@@ -157,14 +157,14 @@ export default function ProfileScreen() {
             <MenuItem
               icon="notifications-outline"
               label="Push Notifications"
-              color={Colors.smartAmber}
+              color={Colors.warning500}
               isSwitch
             />
             <View style={styles.menuDivider} />
             <MenuItem
               icon="moon-outline"
               label="Dark Mode"
-              color={Colors.primary}
+              color={Colors.primary500}
               isSwitch
             />
           </GlassView>
@@ -186,7 +186,7 @@ export default function ProfileScreen() {
           }
           router.replace('/(onboarding)/walkthrough');
         }}>
-          <Ionicons name="log-out-outline" size={20} color={Colors.danger} />
+          <Ionicons name="log-out-outline" size={20} color={Colors.error500} />
           <Text style={styles.logoutText}>Sign Out</Text>
         </Pressable>
 
@@ -360,7 +360,7 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   elaborationBtn: {
-    backgroundColor: Colors.accent,
+    backgroundColor: Colors.primary500,
     paddingVertical: 12,
     borderRadius: 12,
     flexDirection: 'row',
@@ -433,7 +433,7 @@ const styles = StyleSheet.create({
   logoutText: {
     fontFamily: 'Inter_600SemiBold',
     fontSize: 15,
-    color: Colors.danger,
+    color: Colors.error500,
   },
   version: {
     textAlign: 'center',

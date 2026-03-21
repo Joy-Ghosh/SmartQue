@@ -1,0 +1,42 @@
+clinic_name,specialty,area,rating,reviews,booking_start_time,clinic_open_time,clinic_close_time,current_state,current_serving_token,queue_length,avg_consult_time_min,phone_booking_supported,walkin_supported,emergency_supported,prediction_accuracy
+City Dental Clinic,Dental,Ballygunge,4.6,120,7:00,10:00,19:00,booking_open,12,18,8,TRUE,TRUE,FALSE,high
+Life Care Polyclinic,General,Salt Lake,4.3,98,8:00,11:00,20:00,live,15,22,10,TRUE,TRUE,TRUE,medium
+Sunrise Heart Clinic,Cardio,Park Street,4.8,210,9:00,15:00,22:00,closed,0,0,12,TRUE,TRUE,TRUE,high
+Kids Care Pediatric,Pediatric,New Town,4.5,150,7:30,12:00,18:00,booking_open,8,14,9,TRUE,TRUE,TRUE,high
+SkinPlus Clinic,Dermatology,Gariahat,4.4,87,10:00,14:00,21:00,live,20,30,7,TRUE,TRUE,FALSE,medium
+OrthoCare Center,Orthopedic,Behala,4.2,65,8:30,13:00,19:00,booking_open,5,10,11,TRUE,TRUE,FALSE,medium
+Apollo Emergency Unit,Emergency,EM Bypass,4.7,300,0:00,0:00,23:59,live,25,40,6,TRUE,TRUE,TRUE,high
+Medico Eye Clinic,Ophthalmology,Rajarhat,4.5,110,8:00,12:00,18:00,booking_open,6,12,9,TRUE,TRUE,FALSE,high
+Care & Cure ENT,ENT,Dum Dum,4.1,70,9:00,13:00,20:00,live,18,25,8,TRUE,TRUE,FALSE,medium
+Healthy Smile Dental,Dental,Tollygunge,4.3,95,7:30,10:30,18:30,booking_open,10,16,7,TRUE,TRUE,FALSE,high
+Pulse Diagnostic Center,General,Howrah,4,60,8:00,11:00,19:00,closed,0,0,10,TRUE,TRUE,TRUE,medium
+Fortis Emergency Care,Emergency,Anandapur,4.8,340,0:00,0:00,23:59,live,30,50,5,TRUE,TRUE,TRUE,high
+SkinCare Advanced,Dermatology,Park Circus,4.6,140,10:00,15:00,21:00,live,22,28,6,TRUE,TRUE,FALSE,high
+Bone & Joint Clinic,Orthopedic,Barasat,4.2,85,9:00,14:00,20:00,booking_open,7,15,10,TRUE,TRUE,FALSE,medium
+Child Wellness Center,Pediatric,Kestopur,4.4,130,8:00,12:30,19:00,booking_open,9,17,8,TRUE,TRUE,TRUE,high
+Green Leaf Clinic,General,Bagbazar,4.1,75,8:30,11:30,19:30,live,14,20,9,TRUE,TRUE,FALSE,medium
+SmileCraft Dental,Dental,Kasba,4.5,102,7:00,10:00,18:00,booking_open,11,15,8,TRUE,TRUE,FALSE,high
+Urban Skin Studio,Dermatology,Alipore,4.7,165,10:00,14:00,22:00,live,26,32,6,TRUE,TRUE,FALSE,high
+HeartBeat Clinic,Cardio,Esplanade,4.6,190,9:30,16:00,22:30,closed,0,0,11,TRUE,TRUE,TRUE,high
+Little Steps Pediatric,Pediatric,Lake Town,4.3,120,8:00,12:00,18:00,booking_open,10,19,9,TRUE,TRUE,TRUE,medium
+Vision Plus Eye Care,Ophthalmology,Ultadanga,4.4,88,8:30,11:30,18:30,live,16,23,7,TRUE,TRUE,FALSE,medium
+ENT Care Hub,ENT,Sealdah,4,66,9:00,13:00,20:00,live,17,24,8,TRUE,TRUE,FALSE,medium
+Rapid Care Emergency,Emergency,New Alipore,4.9,410,0:00,0:00,23:59,live,35,60,5,TRUE,TRUE,TRUE,high
+Joint Relief Center,Orthopedic,Dhakuria,4.2,78,8:30,13:30,19:00,booking_open,6,13,10,TRUE,TRUE,FALSE,medium
+Metro Health Clinic,General,Shyambazar,4.3,95,8:00,11:00,20:00,booking_open,8,16,9,TRUE,TRUE,FALSE,medium
+Prime Dental Care,Dental,Santoshpur,4.5,130,7:00,10:30,18:30,live,19,27,7,TRUE,TRUE,FALSE,high
+Elite Skin Clinic,Dermatology,Bhawanipore,4.7,180,10:00,14:00,22:00,live,23,29,6,TRUE,TRUE,FALSE,high
+CarePoint Polyclinic,General,Jadavpur,4.2,85,8:00,11:00,19:00,booking_open,7,12,9,TRUE,TRUE,FALSE,medium
+HeartWell Clinic,Cardio,Ruby,4.6,200,9:00,15:00,22:00,closed,0,0,12,TRUE,TRUE,TRUE,high
+TinyCare Pediatric,Pediatric,Barrackpore,4.4,110,8:00,12:00,18:00,booking_open,9,18,8,TRUE,TRUE,TRUE,high
+VisionCare Eye,Ophthalmology,Baranagar,4.3,95,8:30,11:30,18:30,live,15,21,7,TRUE,TRUE,FALSE,medium
+ENT Specialists Hub,ENT,Howrah Maidan,4.1,72,9:00,13:00,20:00,live,18,26,8,TRUE,TRUE,FALSE,medium
+Emergency Plus Hospital,Emergency,Park Street,4.9,500,0:00,0:00,23:59,live,40,70,5,TRUE,TRUE,TRUE,high
+Lakeview Clinic,General,Lake Gardens,4.3,90,8:00,11:30,19:30,booking_open,10,18,9,TRUE,TRUE,FALSE,medium
+Bright Smile Dental,Dental,Behala,4.6,140,7:30,10:30,18:30,live,21,28,7,TRUE,TRUE,FALSE,high
+SkinGlow Clinic,Dermatology,Kasba,4.5,120,10:00,14:30,21:30,live,24,30,6,TRUE,TRUE,FALSE,high
+HeartCare Center,Cardio,EM Bypass,4.7,220,9:00,15:30,22:30,closed,0,0,11,TRUE,TRUE,TRUE,high
+Happy Kids Clinic,Pediatric,Garia,4.4,130,8:00,12:00,18:00,booking_open,11,20,8,TRUE,TRUE,TRUE,high
+Clear Vision Eye,Ophthalmology,Dum Dum,4.2,80,8:30,11:30,18:30,live,14,22,7,TRUE,TRUE,FALSE,medium
+ENT Wellness Center,ENT,Ultadanga,4.1,70,9:00,13:00,20:00,live,17,25,8,TRUE,TRUE,FALSE,medium
+City Emergency Hub,Emergency,New Town,4.8,380,0:00,0:00,23:59,live,38,65,5,TRUE,TRUE,TRUE,high

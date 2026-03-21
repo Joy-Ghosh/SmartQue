@@ -1,17 +1,28 @@
+/**
+ * SmartQ Design System v1 — Color Tokens
+ *
+ * Philosophy: Every color carries meaning. If it doesn't communicate state or
+ * guide behavior, it must not be used.
+ *
+ * Source of truth: SMARTQ_DESIGN_SYSTEM.md
+ */
 export const Colors = {
-  // ── Primary Scale ────────────────────────────────────────────────────────
-  primary100: '#A7EBF2',
-  primary200: '#7FD4DE',
-  primary300: '#54ACBF',
-  primary400: '#3A87A6',
-  primary500: '#26658C',
-  primary600: '#1B4E73',
-  primary700: '#023859',
-  primary800: '#012A47',
-  primary900: '#011C40',
+  // ── Primary Scale (Brand Blue) ────────────────────────────────────────────
+  // Used for: CTAs, highlights, active states, links
+  primary100: '#E6F0F6',   // Backgrounds
+  primary200: '#C8DAFD',
+  primary300: '#93B8FA',
+  primary400: '#3A7EA6',
+  primary500: '#26658C',   // Main
+  primary600: '#21597C',
+  primary700: '#1E4F6E',   // Pressed / strong
+  primary800: '#0E38A4',
+  primary900: '#092481',
 
-  // ── Neutral Scale ────────────────────────────────────────────────────────
-  gray50: '#F8FAFC',
+  // ── Neutral Scale ─────────────────────────────────────────────────────────
+  bgMain:  '#F7F9FB',    // Replaces gray50 logic
+  bgCard:  '#FFFFFF',
+  gray50:  '#F7F9FB',    // Alias
   gray100: '#F1F5F9',
   gray200: '#E2E8F0',
   gray300: '#CBD5E1',
@@ -22,109 +33,148 @@ export const Colors = {
   gray800: '#1E293B',
   gray900: '#0F172A',
 
-  // ── Semantic Colors ──────────────────────────────────────────────────────
-  success100: '#DCFCE7',
-  success500: '#22C55E',
+  // ── Success / Live ────────────────────────────────────────────────────────
+  // Used for: live queue status, confirmed actions
+  success100: '#E8F7ED',
+  success500: '#16A34A',
   success700: '#15803D',
 
-  warning100: '#FEF3C7',
+  // ── Warning / Wait ────────────────────────────────────────────────────────
+  // Used for: wait time, peak period, booking-open state
+  warning100: '#FFF4E5',
   warning500: '#F59E0B',
   warning700: '#B45309',
 
-  error100: '#FEE2E2',
-  error500: '#EF4444',
+  // ── Error / Emergency ─────────────────────────────────────────────────────
+  // Used for: emergency access ONLY — never decorative
+  error100: '#FEECEC',
+  error500: '#DC2626',
   error700: '#B91C1C',
 
-  // ── Surface System ───────────────────────────────────────────────────────
-  surfacePrimary: '#FFFFFF',
-  surfaceSecondary: '#F8FAFC',
-  surfaceTertiary: '#F1F5F9',
-  surfaceBrand: '#F0F7FA',
-
-  // ── Text Colors ──────────────────────────────────────────────────────────
-  textPrimary: '#0F172A',
-  textSecondary: '#475569',
-  textTertiary: '#94A3B8',
-  textInverse: '#FFFFFF',
-
-  // ── Legacy Aliases to prevent app breaking ───────────────────────────────
-  primary: '#26658C',
-  background: '#F8FAFC',
-  surface: '#FFFFFF',
-  text: '#0F172A',
-  textMuted: '#94A3B8',
-  border: '#E2E8F0',
-  borderLight: '#F1F5F9',
-  medicalRed: '#EF4444',
-  dangerBg: '#FEE2E2',
-  success: '#22C55E',
-  successBg: '#DCFCE7',
-  smartAmber: '#F59E0B',
-  warningBg: '#FEF3C7',
-  primaryBg: '#F0F7FA',
-
-  // ── Aliases / Expo Router theme tokens ───────────────────────────────────
-
-  // ── Gradients ────────────────────────────────────────────────────────────
-  gradients: {
-    primary:  ['#5B6EF5', '#7C8FFF'] as const,
-    secondary:['#2EC4B6', '#72D9CF'] as const,
-    dark:     ['#1A1A2E', '#2D2D50'] as const,
-    glass:    ['rgba(255,255,255,0.8)', 'rgba(255,255,255,0.5)'] as const,
-    soft:     ['#F7F5F2', '#EEE9E2'] as const,
-    card:     ['#FFFFFF', '#F7F5F2'] as const,
-    orange:   ['#FB923C', '#F59E0B'] as const,
-    green:    ['#34C48B', '#2EC4B6'] as const,
-    red:      ['#F87171', '#F25C5C'] as const,
-    danger:   ['#F87171', '#F25C5C'] as const,
-    hero:     ['#5B6EF5', '#2EC4B6'] as const,
+  // ── State System ──────────────────────────────────────────────────────────
+  // Maps clinic lifecycle states to semantic colors
+  state: {
+    closed:    '#94A3B8',  // Neutral Gray
+    booking:   '#F59E0B',  // Warning Amber
+    live:      '#26658C',  // Primary Blue
+    emergency: '#DC2626',  // Error Red
   },
 
-  // ── Shadows (soft, warm-tinted) ──────────────────────────────────────────
+  // ── Surface System ────────────────────────────────────────────────────────
+  surfacePrimary:   '#FFFFFF',   // Cards, modals
+  surfaceSecondary: '#F7F9FB',   // Screen background
+  surfaceTertiary:  '#F1F5F9',   // Nested surfaces
+  surfaceBrand:     '#EAF1FF',   // Primary-tinted surface
+
+  // ── Text Colors ───────────────────────────────────────────────────────────
+  textPrimary:   '#0F172A',   // Headings, key numbers
+  textSecondary: '#475569',   // Supporting text
+  textTertiary:  '#94A3B8',   // Labels, captions
+  textInverse:   '#FFFFFF',   // Text on dark backgrounds
+  textOnColor:   '#FFFFFF',   // Text on primary/status bgs
+  textOnColorSecondary: 'rgba(255,255,255,0.85)',
+
+  // ── Border ────────────────────────────────────────────────────────────────
+  border:      '#E2E8F0',
+  borderLight: '#F1F5F9',
+
+  // ── Gradients ─────────────────────────────────────────────────────────────
+  gradients: {
+    primary:  ['#26658C', '#1E4F6E'] as const,
+    hero:     ['#26658C', '#16A34A'] as const,
+    dark:     ['#0F172A', '#1E293B'] as const,
+    glass:    ['rgba(255,255,255,0.85)', 'rgba(255,255,255,0.55)'] as const,
+    danger:   ['#F87171', '#DC2626'] as const,
+    green:    ['#16A34A', '#15803D'] as const,
+    card:     ['#FFFFFF', '#F7F9FB'] as const,
+  },
+
+  // ── Shadows ───────────────────────────────────────────────────────────────
   shadows: {
+    none: {
+      shadowColor: 'transparent',
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 0,
+      shadowRadius: 0,
+      elevation: 0,
+    },
     sm: {
-      shadowColor: '#1A1A2E',
+      shadowColor: '#0F172A',
       shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.06,
-      shadowRadius: 4,
+      shadowOpacity: 0.05,
+      shadowRadius: 8,
       elevation: 2,
     },
     md: {
-      shadowColor: '#1A1A2E',
+      shadowColor: '#0F172A',
       shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.09,
+      shadowOpacity: 0.08,
       shadowRadius: 12,
       elevation: 4,
     },
     lg: {
-      shadowColor: '#1A1A2E',
+      shadowColor: '#0F172A',
       shadowOffset: { width: 0, height: 8 },
-      shadowOpacity: 0.13,
+      shadowOpacity: 0.12,
       shadowRadius: 24,
       elevation: 10,
     },
-    glow: {
-      shadowColor: '#5B6EF5',
-      shadowOffset: { width: 0, height: 0 },
-      shadowOpacity: 0.35,
-      shadowRadius: 12,
-      elevation: 6,
+    // Upward shadow — for sticky footers
+    sticky: {
+      shadowColor: '#0F172A',
+      shadowOffset: { width: 0, height: -4 },
+      shadowOpacity: 0.08,
+      shadowRadius: 16,
+      elevation: 12,
     },
   },
 
-  // Mapping Expo router requirements to our new tokens to prevent breaking
+  // ── Legacy Aliases (backward compat — do not use in new code) ─────────────
+  primary:     '#26658C',
+  background:  '#F7F9FB',
+  surface:     '#FFFFFF',
+  text:        '#0F172A',
+  textMuted:   '#94A3B8',
+  medicalRed:  '#DC2626',
+  danger:      '#DC2626',
+  dangerBg:    '#FEECEC',
+  success:     '#16A34A',
+  successBg:   '#E8F7ED',
+  warning:     '#F59E0B',
+  warningBg:   '#FFF4E5',
+  smartAmber:  '#F59E0B',
+  primaryBg:   '#E6F0F6',
+  secondary:   '#64748B',
+  secondaryBg: '#F1F5F9',
+  accent:      '#26658C',
+  primary50:   '#E6F0F6',
+  shadowMd: {
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  status: {
+    success: '#16A34A',
+    warning: '#F59E0B',
+    error:   '#DC2626',
+    info:    '#26658C',
+  },
+
+  // ── Expo Router theme tokens ───────────────────────────────────────────────
   light: {
-    text: '#0F172A',
-    background: '#F8FAFC',
-    tint: '#26658C',
-    tabIconDefault: '#94A3B8',
+    text:            '#0F172A',
+    background:      '#F7F9FB',
+    tint:            '#26658C',
+    tabIconDefault:  '#94A3B8',
     tabIconSelected: '#26658C',
   },
   dark: {
-    text: '#FFFFFF',
-    background: '#0F172A',
-    tint: '#26658C',
-    tabIconDefault: '#475569',
+    text:            '#FFFFFF',
+    background:      '#0F172A',
+    tint:            '#26658C',
+    tabIconDefault:  '#475569',
     tabIconSelected: '#26658C',
   },
 };

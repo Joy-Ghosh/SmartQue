@@ -16,68 +16,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import Colors from '@/constants/colors';
 import { Layout } from '@/constants/layout';
 
-const ALL_CLINICS = [
-    {
-        id: '1',
-        name: 'Jay Dental Clinic',
-        doctor: 'Dr. John Doe',
-        specialty: 'Dentist',
-        rating: 4.8,
-        distance: '1.2 km',
-        waitTimeMin: 10,
-        services: ['dental', 'general'],
-        image: 'https://images.unsplash.com/photo-1629909613654-28e377c37b09?w=800&auto=format&fit=crop&q=60',
-        tags: ['Open Now'],
-    },
-    {
-        id: '2',
-        name: 'City Health Center',
-        doctor: 'Dr. Sarah Smith',
-        specialty: 'General',
-        rating: 4.5,
-        distance: '2.5 km',
-        waitTimeMin: 45,
-        services: ['general'],
-        image: 'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?w=800&auto=format&fit=crop&q=60',
-        tags: ['Open Now'],
-    },
-    {
-        id: '3',
-        name: 'Life Care Polyclinic',
-        doctor: 'Dr. Michael Brown',
-        specialty: 'Skin',
-        rating: 4.2,
-        distance: '3.8 km',
-        waitTimeMin: 75,
-        services: ['dermatology', 'general'],
-        image: 'https://images.unsplash.com/photo-1538108149393-fbbd81895907?w=800&auto=format&fit=crop&q=60',
-        tags: ['Closed Soon'],
-    },
-    {
-        id: '4',
-        name: 'Sunrise Heart Clinic',
-        doctor: 'Dr. Emily Chen',
-        specialty: 'Cardio',
-        rating: 4.9,
-        distance: '5.0 km',
-        waitTimeMin: 20,
-        services: ['cardiology', 'general'],
-        image: 'https://images.unsplash.com/photo-1666214280557-f1b5022eb634?w=800&auto=format&fit=crop&q=60',
-        tags: ['Open Now'],
-    },
-    {
-        id: '5',
-        name: 'Kids Care Pediatric',
-        doctor: 'Dr. David Wilson',
-        specialty: 'Pediatrician',
-        rating: 4.7,
-        distance: '4.2 km',
-        waitTimeMin: 5,
-        services: ['pediatrics', 'general'],
-        image: 'https://images.unsplash.com/photo-1631217868264-e5b90bb7e133?w=800&auto=format&fit=crop&q=60',
-        tags: ['Open Now'],
-    },
-];
+import { clinics, getClinicDoctor } from '@/lib/data';
 
 const FILTERS = ['All', 'General', 'Dental', 'Skin', 'Cardio', 'Pediatric', 'Lab Tests', 'Open Now', 'Wait <30m'];
 
@@ -86,29 +25,32 @@ export default function SearchScreen() {
     const [searchQuery, setSearchQuery] = useState('');
     const [activeFilter, setActiveFilter] = useState('All');
 
-    const filteredClinics = ALL_CLINICS.filter((clinic) => {
+    const filteredClinics = clinics.filter((clinic) => {
+        const docName = getClinicDoctor(clinic.id)?.name || '';
         const matchesSearch = clinic.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            clinic.doctor.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            clinic.specialty.toLowerCase().includes(searchQuery.toLowerCase());
+            docName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            clinic.type.toLowerCase().includes(searchQuery.toLowerCase());
 
         if (!matchesSearch) return false;
 
-        if (activeFilter === 'General') return clinic.services.includes('general');
-        if (activeFilter === 'Dental') return clinic.services.includes('dental');
-        if (activeFilter === 'Skin') return clinic.services.includes('dermatology');
-        if (activeFilter === 'Cardio') return clinic.services.includes('cardiology');
-        if (activeFilter === 'Pediatric') return clinic.services.includes('pediatrics');
-        if (activeFilter === 'Lab Tests') return clinic.services.includes('lab');
-        if (activeFilter === 'Open Now') return clinic.tags.includes('Open Now');
-        if (activeFilter === 'Wait <30m') return clinic.waitTimeMin < 30;
+        if (activeFilter === 'General') return clinic.type.includes('general');
+        if (activeFilter === 'Dental') return clinic.type.includes('dental');
+        if (activeFilter === 'Skin') return clinic.type.includes('dermatology') || clinic.type.includes('skin');
+        if (activeFilter === 'Cardio') return clinic.type.includes('cardio');
+        if (activeFilter === 'Pediatric') return clinic.type.includes('pediatric');
+        if (activeFilter === 'Lab Tests') return clinic.type.includes('lab');
+        if (activeFilter === 'Open Now') return clinic.state === 'live' || clinic.state === 'booking_open';
+        
+        const waitTime = clinic.currentQueueLength * clinic.avgWaitTimePerPatient;
+        if (activeFilter === 'Wait <30m') return waitTime < 30;
 
         return true;
     });
 
     const getStatusConfig = (mins: number) => {
-        if (mins < 15) return { bg: Colors.successBg, text: Colors.success, dot: Colors.success, label: `<15m` };
-        if (mins < 60) return { bg: Colors.warningBg, text: Colors.warning, dot: Colors.warning, label: `~${mins}m` };
-        return { bg: Colors.dangerBg, text: Colors.danger, dot: Colors.danger, label: `1h+` };
+        if (mins < 15) return { bg: Colors.success100, text: Colors.success500, dot: Colors.success500, label: `<15m` };
+        if (mins < 60) return { bg: Colors.warning100, text: Colors.warning500, dot: Colors.warning500, label: `~${mins}m` };
+        return { bg: Colors.error100, text: Colors.error500, dot: Colors.error500, label: `1h+` };
     };
 
     return (
@@ -175,24 +117,29 @@ export default function SearchScreen() {
             <ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
                 {filteredClinics.length > 0 ? (
                     filteredClinics.map((clinic, index) => {
-                        const status = getStatusConfig(clinic.waitTimeMin);
+                        const waitTime = clinic.currentQueueLength * clinic.avgWaitTimePerPatient;
+                        const status = getStatusConfig(waitTime);
+                        const docName = getClinicDoctor(clinic.id)?.name || 'Unknown Doctor';
+                        const imageSource = clinic.image?.startsWith('http') 
+                                            ? { uri: clinic.image } 
+                                            : { uri: `https://images.unsplash.com/photo-1629909613654-28e377c37b09?w=800&auto=format&fit=crop&q=60` };
                         return (
                             <Animated.View
                                 key={clinic.id}
-                                entering={FadeInDown.duration(400).delay(index * 80)}
+                                entering={FadeInDown.duration(400).delay((index % 5) * 80)}
                             >
                                 <Link href={`/clinic/${clinic.id}` as any} asChild>
                                     <Pressable style={styles.clinicCard}>
-                                        <Image source={{ uri: clinic.image }} style={styles.clinicImage} />
+                                        <Image source={imageSource} style={styles.clinicImage} />
 
                                         <View style={styles.clinicContent}>
                                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                                                 <View style={{ flex: 1, marginRight: 8 }}>
                                                     <Text style={styles.clinicName}>{clinic.name}</Text>
-                                                    <Text style={styles.clinicSpecialty}>{clinic.specialty} • {clinic.doctor}</Text>
+                                                    <Text style={[styles.clinicSpecialty, {textTransform: 'capitalize'}]}>{clinic.type} • {docName}</Text>
                                                 </View>
                                                 <View style={styles.ratingBadge}>
-                                                    <Ionicons name="star" size={10} color={Colors.smartAmber} />
+                                                    <Ionicons name="star" size={10} color={Colors.warning500} />
                                                     <Text style={styles.ratingText}>{clinic.rating}</Text>
                                                 </View>
                                             </View>
@@ -200,7 +147,7 @@ export default function SearchScreen() {
                                             <View style={styles.clinicFooter}>
                                                 <View style={styles.distanceBadge}>
                                                     <Ionicons name="location-outline" size={11} color={Colors.textSecondary} />
-                                                    <Text style={styles.distanceText}>{clinic.distance}</Text>
+                                                    <Text style={styles.distanceText}>{clinic.distance} km</Text>
                                                 </View>
 
                                                 <View style={[styles.statusBadge, { backgroundColor: status.bg }]}>
@@ -346,7 +293,7 @@ const styles = StyleSheet.create({
     ratingBadge: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: Colors.warningBg,
+        backgroundColor: Colors.warning100,
         paddingHorizontal: 6,
         paddingVertical: 3,
         borderRadius: 6,
@@ -355,7 +302,7 @@ const styles = StyleSheet.create({
     ratingText: {
         fontFamily: 'Inter_700Bold',
         fontSize: 10,
-        color: Colors.smartAmber,
+        color: Colors.warning500,
     },
     clinicFooter: {
         flexDirection: 'row',
@@ -400,7 +347,7 @@ const styles = StyleSheet.create({
         width: 60,
         height: 60,
         borderRadius: 20,
-        backgroundColor: Colors.primaryBg,
+        backgroundColor: Colors.primary100,
         alignItems: 'center',
         justifyContent: 'center',
     },

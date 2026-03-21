@@ -90,7 +90,7 @@ export default function PaymentMethodsScreen() {
                   
                   {card.default && (
                     <View style={styles.defaultBadge}>
-                      <Ionicons name="checkmark-circle" size={14} color={Colors.success} />
+                      <Ionicons name="checkmark-circle" size={14} color={Colors.success500} />
                       <Text style={styles.defaultText}>Default</Text>
                     </View>
                   )}
@@ -111,7 +111,7 @@ export default function PaymentMethodsScreen() {
 
         <Pressable style={({ pressed }) => [styles.addCardBtn, pressed && { opacity: 0.7 }]}>
           <View style={styles.addCardIconWrap}>
-            <Ionicons name="add" size={24} color={Colors.primary} />
+            <Ionicons name="add" size={24} color={Colors.primary500} />
           </View>
           <Text style={styles.addCardText}>Add New Card</Text>
         </Pressable>
@@ -122,7 +122,7 @@ export default function PaymentMethodsScreen() {
         
         <GlassView intensity={60} style={styles.insuranceCard} border>
           <View style={styles.insuranceIconWrap}>
-            <Ionicons name="shield-checkmark" size={24} color={Colors.secondary} />
+            <Ionicons name="shield-checkmark" size={24} color={Colors.primary300} />
           </View>
           <View style={styles.insuranceInfo}>
             <Text style={styles.insuranceName}>Blue Cross Blue Shield</Text>
@@ -302,7 +302,7 @@ const styles = StyleSheet.create({
   addCardText: {
     fontFamily: 'Inter_600SemiBold',
     fontSize: 15,
-    color: Colors.primary,
+    color: Colors.primary500,
   },
   divider: {
     height: 1,
@@ -356,7 +356,7 @@ const styles = StyleSheet.create({
   addInsuranceText: {
     fontFamily: 'Inter_600SemiBold',
     fontSize: 14,
-    color: Colors.secondaryDark,
+    color: Colors.primary500,
   },
   securityFooter: {
     marginTop: 40,

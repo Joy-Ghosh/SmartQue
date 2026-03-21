@@ -61,7 +61,7 @@ export default function OTPScreen() {
                 <View style={styles.content}>
                     <View style={styles.header}>
                         <View style={styles.iconWrap}>
-                            <Ionicons name="shield-checkmark-outline" size={32} color={Colors.success} />
+                            <Ionicons name="shield-checkmark-outline" size={32} color={Colors.success500} />
                         </View>
                         <Text style={styles.title}>Verify it's you</Text>
                         <Text style={styles.subtitle}>
@@ -187,8 +187,8 @@ const styles = StyleSheet.create({
         color: Colors.text,
     },
     otpInputFilled: {
-        borderColor: Colors.primary,
-        backgroundColor: Colors.primary + '10',
+        borderColor: Colors.primary500,
+        backgroundColor: Colors.primary100,
     },
     resendBtn: {
         marginTop: 24,
@@ -200,7 +200,7 @@ const styles = StyleSheet.create({
         color: Colors.textMuted,
     },
     resendLink: {
-        color: Colors.primary,
+        color: Colors.primary500,
         fontFamily: 'Inter_700Bold',
     },
 });

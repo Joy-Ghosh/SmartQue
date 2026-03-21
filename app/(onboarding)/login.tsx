@@ -106,7 +106,7 @@ const styles = StyleSheet.create({
         width: 320,
         height: 320,
         borderRadius: 160,
-        backgroundColor: Colors.primaryBg,
+        backgroundColor: Colors.primary100,
         opacity: 0.8,
     },
     bottomBlob: {
@@ -116,7 +116,7 @@ const styles = StyleSheet.create({
         width: 240,
         height: 240,
         borderRadius: 120,
-        backgroundColor: Colors.secondaryBg,
+        backgroundColor: Colors.primary100, // using primary for both blobs
         opacity: 0.6,
     },
     keyboardView: {
@@ -161,7 +161,7 @@ const styles = StyleSheet.create({
         ...Colors.shadows.sm,
     },
     inputCardFocused: {
-        borderColor: Colors.primary,
+        borderColor: Colors.primary500,
         ...Colors.shadows.md,
     },
     label: {
@@ -211,7 +211,7 @@ const styles = StyleSheet.create({
         lineHeight: 18,
     },
     link: {
-        color: Colors.primary,
+        color: Colors.primary500,
         fontFamily: 'Inter_600SemiBold',
     },
 });

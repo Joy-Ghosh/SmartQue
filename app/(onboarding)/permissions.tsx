@@ -22,7 +22,7 @@ export default function PermissionsScreen() {
         <View style={styles.container}>
             <View style={styles.iconContainer}>
                 <View style={styles.circle}>
-                    <Ionicons name="location" size={48} color={Colors.primary} />
+                    <Ionicons name="location" size={48} color={Colors.primary500} />
                 </View>
                 {/* Decorative pulse rings could go here */}
             </View>
@@ -70,7 +70,7 @@ const styles = StyleSheet.create({
         width: 100,
         height: 100,
         borderRadius: 50,
-        backgroundColor: Colors.primary + '15', // Light indigo bg
+        backgroundColor: Colors.primary100, // Light indigo bg
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -113,12 +113,12 @@ const styles = StyleSheet.create({
         gap: 16,
     },
     primaryButton: {
-        backgroundColor: Colors.primary,
+        backgroundColor: Colors.primary500,
         height: 56,
         borderRadius: Radius.lg,
         alignItems: 'center',
         justifyContent: 'center',
-        shadowColor: Colors.primary,
+        shadowColor: Colors.primary500,
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.2,
         shadowRadius: 8,

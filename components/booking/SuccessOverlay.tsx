@@ -22,6 +22,8 @@ interface SuccessOverlayProps {
     doctorName: string;
     clinicName: string;
     estimatedTime: string;
+    consultationFee: number;
+    isEmergency?: boolean;
     onClose: () => void;
 }
 
@@ -31,6 +33,8 @@ export default function SuccessOverlay({
     doctorName,
     clinicName,
     estimatedTime,
+    consultationFee,
+    isEmergency = false,
     onClose,
 }: SuccessOverlayProps) {
     const scale = useSharedValue(0);
@@ -55,7 +59,7 @@ export default function SuccessOverlay({
     const fadeStyle = useAnimatedStyle(() => ({ opacity: contentOpacity.value }));
 
     const handleGoHome = () => {
-        onClose();
+        // Just go home, bypassing the token-specific onClose logic
         router.replace('/(tabs)');
     };
 
@@ -67,13 +71,13 @@ export default function SuccessOverlay({
                 <BlurView intensity={90} tint="light" style={StyleSheet.absoluteFill} />
 
                 <View style={styles.content}>
-                    <Animated.View style={[styles.successCircle, checkmarkStyle]}>
-                        <Ionicons name="checkmark" size={48} color="#fff" />
+                    <Animated.View style={[styles.successCircle, checkmarkStyle, isEmergency && { backgroundColor: Colors.error500 }]}>
+                        <Ionicons name={isEmergency ? "warning" : "checkmark"} size={48} color="#fff" />
                     </Animated.View>
 
                     <Animated.View style={[styles.textContainer, fadeStyle]}>
-                        <Text style={styles.title}>Booking Confirmed!</Text>
-                        <Text style={styles.subtitle}>You have successfully joined the queue.</Text>
+                        <Text style={styles.title}>{isEmergency ? "Priority Confirmed!" : "Booking Confirmed!"}</Text>
+                        <Text style={styles.subtitle}>{isEmergency ? "Clinic has been notified of your emergency." : "You have successfully joined the queue."}</Text>
                     </Animated.View>
 
                     {/* Ticket */}
@@ -86,8 +90,8 @@ export default function SuccessOverlay({
                         <View style={styles.ticketBody}>
                             <Text style={styles.doctorName}>{doctorName}</Text>
                             <View style={styles.tokenDisplay}>
-                                <Text style={styles.tokenLabel}>YOUR TOKEN</Text>
-                                <Text style={styles.tokenValue}>#{tokenNumber}</Text>
+                                <Text style={styles.tokenLabel}>{isEmergency ? "PRIORITY ACCESS" : "YOUR TOKEN"}</Text>
+                                <Text style={[styles.tokenValue, isEmergency && { color: Colors.error500 }]}>{isEmergency ? "HIGH" : `#${tokenNumber}`}</Text>
                             </View>
                             <View style={styles.divider} />
                             <View style={styles.qrContainer}>
@@ -100,16 +104,18 @@ export default function SuccessOverlay({
                     {/* Actions */}
                     <Animated.View style={[styles.actionsContainer, fadeStyle]}>
                         <View style={styles.smartNote}>
-                            <Ionicons name="information-circle" size={20} color={Colors.primary} />
+                            <Ionicons name="information-circle" size={20} color={isEmergency ? Colors.error500 : Colors.primary500} />
                             <Text style={styles.noteText}>
-                                We will notify you at <Text style={{ fontWeight: '700' }}>{estimatedTime}</Text>.
+                                {isEmergency 
+                                   ? `Proceed immediately. Approx total: ₹${consultationFee}`
+                                   : `We will notify you at ${estimatedTime}. Approx total: ₹${consultationFee}`}
                             </Text>
                         </View>
 
                         <GradientButton
-                            title="Go to Home"
-                            onPress={handleGoHome}
-                            icon="home"
+                            title={isEmergency ? "Go to Live Queue" : "Go to Home"}
+                            onPress={isEmergency ? onClose : handleGoHome}
+                            icon={isEmergency ? "map" : "home"}
                             style={{ width: '100%' }}
                         />
 
@@ -139,7 +145,7 @@ const styles = StyleSheet.create({
         width: 80,
         height: 80,
         borderRadius: 40,
-        backgroundColor: Colors.confidenceGreen,
+        backgroundColor: Colors.success500,
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: 24,
@@ -170,7 +176,7 @@ const styles = StyleSheet.create({
         ...Colors.shadows.md,
     },
     ticketHeader: {
-        backgroundColor: Colors.primary,
+        backgroundColor: Colors.primary500,
         paddingVertical: 16,
         alignItems: 'center',
         position: 'relative',
@@ -223,7 +229,7 @@ const styles = StyleSheet.create({
     tokenValue: {
         fontFamily: 'Inter_700Bold',
         fontSize: 48,
-        color: Colors.primary,
+        color: Colors.primary500,
     },
     divider: {
         width: '100%',
@@ -250,7 +256,7 @@ const styles = StyleSheet.create({
     smartNote: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: Colors.secondaryBg,
+        backgroundColor: Colors.primary100,
         padding: 12,
         borderRadius: 12,
         gap: 10,

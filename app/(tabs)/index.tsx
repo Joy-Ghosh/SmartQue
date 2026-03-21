@@ -9,7 +9,9 @@ import {
     TextInput,
     StatusBar,
     Modal,
+    Platform,
 } from 'react-native';
+
 import { Ionicons } from '@expo/vector-icons';
 import { Link, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -24,82 +26,24 @@ import Animated, {
 import { LinearGradient } from 'expo-linear-gradient';
 import Colors from '@/constants/colors';
 import { Layout } from '@/constants/layout';
+import { Typography } from '@/constants/styles';
+import { Motion } from '@/constants/motion';
 import { useQueue } from '@/lib/queue-context';
+import { AnimatedButton } from '@/components/AnimatedButton';
+import { CountUp } from '@/components/CountUp';
+import { clinics, getClinicDoctor, Clinic } from '@/lib/data';
+
+const IS_IOS = Platform.OS === 'ios';
+const IS_ANDROID = Platform.OS === 'android';
 
 // ─────────────────────────────────────────────────────────────────
 // Data
 // ─────────────────────────────────────────────────────────────────
 const LOCATIONS = ['Mumbai', 'Delhi', 'Bengaluru', 'Chennai', 'Pune', 'Hyderabad', 'Kolkata'];
 
-const CATEGORIES = [
-    { id: 'all',         name: 'All',       icon: 'apps',         color: Colors.primary100,   iconColor: Colors.primary500 },
-    { id: 'general',     name: 'General',   icon: 'medkit',       color: Colors.primary100,   iconColor: Colors.primary500 },
-    { id: 'dental',      name: 'Dental',    icon: 'medical',      color: '#E6F9F8',          iconColor: '#2EC4B6' },
-    { id: 'dermatology', name: 'Skin',      icon: 'happy',        color: '#FEF3C7',          iconColor: Colors.warning500 },
-    { id: 'cardiology',  name: 'Cardio',    icon: 'heart',        color: Colors.error100,    iconColor: Colors.error500 },
-    { id: 'pediatrics',  name: 'Kids',      icon: 'people',       color: Colors.success100,   iconColor: Colors.success500 },
-];
-
-interface Clinic {
-    id: string;
-    name: string;
-    doctor: string;
-    specialty: string;
-    rating: number;
-    distance: string;
-    waitTimeMin: number;
-    services: string[];
-    image: string;
-    currentToken: number;
-    nextToken: number;
-}
-
-const CLINICS: Clinic[] = [
-    {
-        id: '1',
-        name: 'City Dental Clinic',
-        doctor: 'Dr. Aditi Kulkarni',
-        specialty: 'Dentist',
-        rating: 4.8,
-        distance: '1.2 km',
-        waitTimeMin: 10,
-        services: ['dental', 'general'],
-        image: 'https://images.unsplash.com/photo-1629909613654-28e377c37b09?w=400&auto=format&fit=crop&q=60',
-        currentToken: 12,
-        nextToken: 13,
-    },
-    {
-        id: '2',
-        name: 'Lotus Medical Centre',
-        doctor: 'Dr. Rahul Mehta',
-        specialty: 'General Physician',
-        rating: 4.5,
-        distance: '2.5 km',
-        waitTimeMin: 45,
-        services: ['general'],
-        image: 'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?w=400&auto=format&fit=crop&q=60',
-        currentToken: 8,
-        nextToken: 20,
-    },
-    {
-        id: '3',
-        name: 'SkinCare Plus',
-        doctor: 'Dr. Priya Sharma',
-        specialty: 'Dermatologist',
-        rating: 4.9,
-        distance: '3.8 km',
-        waitTimeMin: 75,
-        services: ['dermatology', 'general'],
-        image: 'https://images.unsplash.com/photo-1538108149393-fbbd81895907?w=400&auto=format&fit=crop&q=60',
-        currentToken: 5,
-        nextToken: 17,
-    },
-];
-
 // ─────────────────────────────────────────────────────────────────
 // Sub-components
 // ─────────────────────────────────────────────────────────────────
-
 /** Animated live dot */
 function LiveDot({ color = Colors.success500 }: { color?: string }) {
     const opacity = useSharedValue(1);
@@ -110,35 +54,48 @@ function LiveDot({ color = Colors.success500 }: { color?: string }) {
         );
     }, []);
     const style = useAnimatedStyle(() => ({ opacity: opacity.value }));
-    return <Animated.View style={[{ width: 6, height: 6, borderRadius: 3, backgroundColor: color }, style]} />;
+    return <Animated.View style={[{ width: 8, height: 8, borderRadius: 4, backgroundColor: color }, style]} />;
 }
 
 /** Single clinic card */
 function ClinicCard({ clinic, index }: { clinic: Clinic; index: number }) {
-    return (
-        <Animated.View entering={FadeInDown.duration(400).delay(350 + index * 80)}>
-            <Link href={`/clinic/${clinic.id}` as any} asChild>
-                <Pressable style={styles.clinicCard}>
-                    {/* Clinic Image */}
-                    <Image source={{ uri: clinic.image }} style={styles.clinicCardImage} />
+    const isLive = clinic.state === 'live';
+    const isBooking = clinic.state === 'booking_open';
+    const stateColor = isLive ? Colors.state.live : isBooking ? Colors.state.booking : Colors.state.closed;
+    const stateText = isLive ? 'Live' : isBooking ? 'Booking Open' : 'Closed';
+    const servingNum = clinic.servingToken || 0;
+    const yourNum = servingNum + clinic.currentQueueLength;
 
-                    {/* Clinic Info */}
-                    <View style={styles.clinicCardInfo}>
-                        <Text style={styles.clinicCardName} numberOfLines={1}>{clinic.name}</Text>
-                        <Text style={styles.clinicCardDoctor} numberOfLines={1}>
-                            {clinic.doctor} • {clinic.specialty}
-                        </Text>
-                        
-                        <View style={styles.clinicCardMetaRow}>
-                            <Text style={styles.clinicCardMetaText}>⭐ {clinic.rating} • {clinic.distance}</Text>
-                            <View style={styles.waitBadge}>
-                                <Text style={styles.waitBadgeText}>{clinic.waitTimeMin} min wait</Text>
+    return (
+        <Animated.View 
+            entering={FadeInDown.duration(Motion.duration.reveal).delay(Motion.stagger * (index % 10)).springify()}
+        >
+            <Link href={`/clinic/${clinic.id}` as any} asChild>
+                <AnimatedButton activeScale={0.98} style={styles.refinedClinicCard}>
+                    <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start'}}>
+                        <View>
+                            <Text style={styles.refinedClinicName}>{clinic.name}</Text>
+                            <View style={styles.refinedClinicStateRow}>
+                                <View style={[styles.refinedClinicStateDot, { backgroundColor: stateColor }]} />
+                                <Text style={[styles.refinedClinicStateText, { color: stateColor }]}>{stateText}</Text>
+                                {isLive && <Text style={styles.refinedClinicServing}>• Serving #{servingNum}</Text>}
                             </View>
                         </View>
-                        
-                        <Text style={styles.predictText}>Leave home in {clinic.waitTimeMin + 2} minutes</Text>
+                        <View style={[styles.refinedClinicTag, { backgroundColor: stateColor + '15' }]}>
+                            <Text style={[styles.refinedClinicTagText, { color: stateColor }]}>{stateText}</Text>
+                        </View>
                     </View>
-                </Pressable>
+
+                    <View style={styles.refinedClinicPredictBox}>
+                        <View>
+                             <Text style={styles.refinedClinicPredictLine}>You will be <Text style={{fontFamily: 'Inter_700Bold', color: Colors.textPrimary}}>#{yourNum}</Text></Text>
+                             <Text style={styles.refinedClinicPredictTime}>~{clinic.avgWaitTimePerPatient * clinic.currentQueueLength} min wait</Text>
+                        </View>
+                        <View style={styles.refinedClinicActionBtn}>
+                            <Text style={styles.refinedClinicActionText}>View Details</Text>
+                        </View>
+                    </View>
+                </AnimatedButton>
             </Link>
         </Animated.View>
     );
@@ -152,178 +109,224 @@ export default function HomeScreen() {
     const { activeBooking } = useQueue();
     const [selectedLocation, setSelectedLocation] = useState('Mumbai');
     const [showLocationModal, setShowLocationModal] = useState(false);
-    const [selectedCategory, setSelectedCategory] = useState('all');
-    const [searchQuery, setSearchQuery] = useState('');
+    const bestClinic = clinics[0] || null;
 
-    const filteredClinics = CLINICS.filter(c => {
-        const matchesCat = selectedCategory === 'all' || c.services.includes(selectedCategory);
-        const matchesSearch = !searchQuery ||
-            c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            c.doctor.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            c.specialty.toLowerCase().includes(searchQuery.toLowerCase());
-        return matchesCat && matchesSearch;
-    });
-
-    const shortestWait = Math.min(...CLINICS.map(c => c.waitTimeMin));
-    const avgWait = Math.round(CLINICS.reduce((s, c) => s + c.waitTimeMin, 0) / CLINICS.length);
-
-    const hour = new Date().getHours();
-    const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+    // Intelligence for Active Card
+    const peopleAhead = activeBooking ? activeBooking.tokenNumber - activeBooking.servingToken : 0;
+    const waitTime = activeBooking ? peopleAhead * activeBooking.avgWaitTime : 0;
+    const leaveIn = activeBooking ? (waitTime - activeBooking.travelTime - 5) : 0;
+    const isLive = activeBooking && activeBooking.servingToken > 0;
 
     return (
         <View style={styles.container}>
             <StatusBar barStyle="dark-content" />
             <ScrollView
                 contentContainerStyle={[
-                    { paddingTop: insets.top + Layout.spacing.space5, paddingBottom: 120 + insets.bottom, paddingHorizontal: 20 },
+                    { paddingTop: insets.top + Layout.spacing.space4, paddingBottom: 160 + insets.bottom, paddingHorizontal: 20 },
                 ]}
                 showsVerticalScrollIndicator={false}
             >
                 <View style={styles.pageStructure}>
 
-                    {/* ══ HEADER SECTION ══════════════════════════════════════════════════ */}
-                    <Animated.View entering={FadeInDown.duration(400).delay(0)} style={styles.headerSection}>
-                        <Pressable style={styles.locationBlock} onPress={() => setShowLocationModal(true)}>
-                            <Text style={styles.locationLabel}>YOUR LOCATION</Text>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                                <Text style={styles.locationCity}>{selectedLocation}</Text>
-                                <Ionicons name="chevron-down" size={12} color={Colors.gray500} />
+                    {/* [SECTION 1] ══ DYNAMIC HEADER ══════════════════════════════════════════════════ */}
+                    <Animated.View entering={FadeInDown.duration(400).delay(0)} style={styles.systemStateHeader}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <Pressable style={styles.locationBlock} onPress={() => setShowLocationModal(true)}>
+                                <Text style={styles.locationCity}>{selectedLocation} <Ionicons name="chevron-down" size={14} color={Colors.textPrimary} /></Text>
+                            </Pressable>
+                            
+                            <View style={{flexDirection: 'row', alignItems: 'center', gap: 12}}>
+                                {activeBooking && (
+                                    <View style={styles.activeMiniBadge}>
+                                        <LiveDot color={Colors.state.live} />
+                                        <Text style={styles.activeMiniText}>#{activeBooking.tokenNumber}</Text>
+                                    </View>
+                                )}
+                                <AnimatedButton onPress={() => router.push('/(tabs)/profile')}>
+                                    <Image
+                                        source={{ uri: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&auto=format&fit=crop&q=60' }}
+                                        style={styles.avatar}
+                                    />
+                                </AnimatedButton>
                             </View>
-                        </Pressable>
-
-                        <View style={styles.headerActions}>
-                            <Pressable style={styles.bellIcon}>
-                                <Ionicons name="notifications-outline" size={24} color={Colors.gray700} />
-                            </Pressable>
-                            <Pressable onPress={() => router.push('/(tabs)/profile')}>
-                                <Image
-                                    source={{ uri: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&auto=format&fit=crop&q=60' }}
-                                    style={styles.avatar}
-                                />
-                            </Pressable>
                         </View>
-                    </Animated.View>
-
-                    {/* ══ GREETING SECTION ════════════════════════════════════════ */}
-                    <Animated.View entering={FadeInDown.duration(400).delay(60)} style={styles.greetingSection}>
-                        <Text style={styles.greetingHeading}>{greeting} 👋</Text>
-                        <Text style={styles.greetingSubtitle}>Find a clinic, skip the wait</Text>
-                    </Animated.View>
-
-                    {/* ══ SEARCH COMPONENT ════════════════════════════════════════ */}
-                    <Animated.View entering={FadeInDown.duration(400).delay(100)} style={styles.searchComponent}>
-                        <Ionicons name="search" size={20} color={Colors.gray500} />
-                        <TextInput
-                            placeholder="Search doctors, clinics..."
-                            placeholderTextColor={Colors.gray400}
-                            style={styles.searchInput}
-                            value={searchQuery}
-                            onChangeText={setSearchQuery}
-                            returnKeyType="search"
-                            onFocus={() => router.push('/(tabs)/search')}
-                        />
-                        <Pressable style={styles.filterButton} onPress={() => router.push('/(tabs)/search')}>
-                            <Ionicons name="options-outline" size={20} color={Colors.gray500} />
-                        </Pressable>
-                    </Animated.View>
-
-                    {/* ══ LIVE WAIT INSIGHT (HERO CARD) ════════════════════════════ */}
-                    <Animated.View entering={FadeInDown.duration(400).delay(140)}>
-                        <LinearGradient
-                            colors={[Colors.surfaceBrand, Colors.surfaceBrand]}
-                            style={styles.insightCard}
-                        >
-                            <View style={styles.insightCardLeft}>
-                                <Text style={styles.insightCategoryLabel}>Shortest Wait</Text>
-                                <Text style={styles.insightBigNum}>{shortestWait} min</Text>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                    <LiveDot color={Colors.success500} />
-                                    <Text style={styles.insightSublabel}>Near you now</Text>
-                                </View>
-                            </View>
-
-                            <View style={styles.insightCardRight}>
-                                <Text style={styles.insightCategoryLabel}>Area Average</Text>
-                                <Text style={styles.insightAvgNum}>{avgWait} min</Text>
-                                <Text style={styles.insightClinicsOpen}>{CLINICS.length} clinics open</Text>
-                            </View>
-                        </LinearGradient>
-                    </Animated.View>
-
-                    {/* ══ EMERGENCY CARD ══════════════════════════════════════════ */}
-                    <Animated.View entering={FadeInDown.duration(400).delay(180)}>
-                        <Pressable 
-                            style={styles.emergencyCard}
-                            onPress={() => router.push({ pathname: '/clinic/[id]', params: { id: '1', emergency: 'true' } })}
-                        >
-                            <View style={styles.emergencyLeft}>
-                                <View style={styles.emergencyIconWrap}>
-                                    <Ionicons name="medical" size={16} color={Colors.error500} />
-                                </View>
-                                <View style={{ gap: 2 }}>
-                                    <Text style={styles.emergencyTitle}>Need urgent help?</Text>
-                                    <Text style={styles.emergencySubtitle}>Request emergency priority</Text>
-                                </View>
-                            </View>
-                            <Ionicons name="chevron-forward" size={20} color={Colors.error500} />
-                        </Pressable>
-                    </Animated.View>
-
-                    {/* ══ SPECIALTY FILTERS ══════════════════════════════════════════════ */}
-                    <Animated.View entering={FadeInDown.duration(400).delay(220)} style={styles.specialtySection}>
-                        <Text style={styles.sectionTitle}>Find by Specialty</Text>
                         
-                        <ScrollView
-                            horizontal
-                            showsHorizontalScrollIndicator={false}
-                            contentContainerStyle={styles.chipsScrollContainer}
-                        >
-                            {CATEGORIES.map((cat) => {
-                                const isSelected = selectedCategory === cat.id;
-                                return (
-                                    <Pressable
-                                        key={cat.id}
-                                        style={[
-                                            styles.chipDefault,
-                                            isSelected && styles.chipSelected
-                                        ]}
-                                        onPress={() => setSelectedCategory(cat.id)}
-                                    >
-                                        <Text style={[
-                                            styles.chipTextDefault,
-                                            isSelected && styles.chipTextSelected
-                                        ]}>
-                                            {cat.name}
-                                        </Text>
-                                    </Pressable>
-                                );
-                            })}
-                        </ScrollView>
+                        {!activeBooking ? (
+                            <>
+                                <View style={{ marginTop: 32, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                                    <LiveDot color={Colors.state.live} />
+                                    <Text style={styles.systemStateTitle}>Live Now</Text>
+                                </View>
+                                <Text style={styles.systemStateSub}>Clinics are actively serving patients</Text>
+                            </>
+                        ) : (
+                           <View style={{marginTop: 24}}>
+                                <Text style={styles.commandWelcome}>Your Visit Dashboard</Text>
+                                <Text style={styles.commandStatus}>Real-time monitoring active</Text>
+                           </View> 
+                        )}
                     </Animated.View>
 
-                    {/* ══ NEARBY CLINICS ═══════════════════════════════════════════ */}
-                    <View style={styles.nearbySection}>
-                        <View style={styles.sectionHeaderRow}>
-                            <Text style={styles.sectionTitle}>Nearby Clinics</Text>
-                            <Pressable onPress={() => router.push('/(tabs)/search')}>
-                                <Text style={styles.seeAllText}>See All →</Text>
+                    {/* [SECTION 2] ══ HERO: COMMAND CENTER vs DISCOVERY ══════════════════════════════════════════════════ */}
+                    {activeBooking ? (
+                        <Animated.View entering={FadeInDown.duration(400).delay(50)} style={styles.activeQueueCard}>
+                            <LinearGradient
+                                colors={[Colors.primary500, Colors.primary700]}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 1 }}
+                                style={styles.activeCardGradient}
+                            >
+                                <View style={styles.activeCardTop}>
+                                    <View style={styles.activeCardStatus}>
+                                        <LiveDot color={Colors.textOnColor} />
+                                        <Text style={styles.activeStatusText}>LIVE QUEUE</Text>
+                                    </View>
+                                    <Text style={styles.activeClinicName}>{activeBooking.clinicName}</Text>
+                                </View>
+
+                                <View style={styles.activeCardMain}>
+                                    <View style={styles.activePosCol}>
+                                        <Text style={styles.activePosLabel}>You are</Text>
+                                        <Text style={styles.activePosValue}>#{activeBooking.tokenNumber}</Text>
+                                    </View>
+                                    
+                                    <View style={styles.activeMetaCol}>
+                                        <View style={styles.activeMetaRow}>
+                                            <Ionicons name="people" size={16} color={Colors.textOnColorSecondary} />
+                                            <Text style={styles.activeMetaText}>{peopleAhead} ahead</Text>
+                                        </View>
+                                        <View style={styles.activeMetaRow}>
+                                            <Ionicons name="time" size={16} color={Colors.textOnColorSecondary} />
+                                            <Text style={styles.activeMetaText}>~{waitTime} mins left</Text>
+                                        </View>
+                                    </View>
+                                </View>
+
+                                <View style={styles.activeActionBox}>
+                                    <View style={styles.activeCountdown}>
+                                        <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                                            <CountUp value={Math.max(0, leaveIn)} duration={800} style={styles.countdownValue} />
+                                        </View>
+                                        <Text style={styles.countdownLabel}>mins to leave</Text>
+                                    </View>
+                                    
+                                    <AnimatedButton 
+                                        style={styles.activeViewBtn}
+                                        onPress={() => router.push('/active-token')}
+                                    >
+                                        <Text style={styles.activeViewText}>Full View</Text>
+                                        <Ionicons name="arrow-forward" size={16} color={Colors.primary} />
+                                    </AnimatedButton>
+                                </View>
+                                
+                                {peopleAhead < 2 && (
+                                    <View style={styles.delayAlert}>
+                                        <Ionicons name="notifications" size={14} color="#fff" />
+                                        <Text style={styles.delayText}>It's almost your turn!</Text>
+                                    </View>
+                                )}
+                            </LinearGradient>
+                        </Animated.View>
+                    ) : (
+                        <Animated.View entering={FadeInDown.duration(400).delay(50)} style={styles.heroActionCard}>
+                            <Text style={styles.heroTitle}>Skip the wait right now</Text>
+                            
+                            <View style={styles.heroStatsRow}>
+                                <View>
+                                    <Text style={styles.heroStatLabel}>Shortest queue</Text>
+                                    <Text style={styles.heroStatValue}>10 mins</Text>
+                                </View>
+                                <View style={styles.heroStatDivider} />
+                                <View>
+                                    <Text style={styles.heroStatLabel}>Available</Text>
+                                    <Text style={styles.heroStatValue}>2 clinics</Text>
+                                </View>
+                            </View>
+                            
+                            <Pressable style={styles.heroButton}>
+                                <Text style={styles.heroButtonText}>Find Best Option</Text>
                             </Pressable>
+                        </Animated.View>
+                    )}
+
+                    {/* [SECTION 3] ══ BEST OPTION (ONLY IF NO BOOKING) ══════════════════════════════════════════════════ */}
+                    {!activeBooking && bestClinic && (
+                        <Animated.View entering={FadeInDown.duration(400).delay(100)} style={styles.sectionContainer}>
+                            <Text style={styles.sectionTitleSmall}>Best Option Near You</Text>
+                            
+                            <View style={styles.bestOptionCard}>
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                    <View>
+                                        <Text style={styles.bestOptionName}>{bestClinic.name}</Text>
+                                        <Text style={styles.bestOptionMeta}>⭐ {bestClinic.rating} • {bestClinic.distance} km</Text>
+                                    </View>
+                                    <View style={styles.bestOptionWaitPill}>
+                                        <Text style={styles.bestOptionWaitText}>{bestClinic.avgWaitTimePerPatient * bestClinic.currentQueueLength} min wait</Text>
+                                    </View>
+                                </View>
+                                
+                                <View style={styles.bestOptionContextRow}>
+                                    <Ionicons name="car-outline" size={16} color={Colors.gray600} />
+                                    <Text style={styles.bestOptionLeaveText}>Leave in 12 mins</Text>
+                                </View>
+                                
+                                <Pressable style={styles.bestOptionButton} onPress={() => router.push(`/clinic/${bestClinic.id}`)}>
+                                    <Text style={styles.bestOptionButtonText}>Book Now</Text>
+                                </Pressable>
+                            </View>
+                        </Animated.View>
+                    )}
+
+                    {/* [SECTION 4] ══ EMERGENCY ACCESS ══════════════════════════════════════════════════ */}
+                    <Animated.View entering={FadeInDown.duration(400).delay(150)} style={styles.sectionContainer}>
+                        <Pressable style={styles.emergencyAccessCard} onPress={() => router.push({ pathname: '/clinic/[id]', params: { id: '1', emergency: 'true' } })}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                                <View style={styles.emergencyIconWrap}>
+                                    <Ionicons name="warning" size={18} color={Colors.state.emergency} />
+                                </View>
+                                <Text style={styles.emergencyAccessText}>Need urgent care?</Text>
+                            </View>
+                            <View style={styles.emergencyAccessBtn}>
+                                <Text style={styles.emergencyAccessBtnText}>Emergency Priority</Text>
+                            </View>
+                        </Pressable>
+                    </Animated.View>
+
+                    {/* [SECTION 5] ══ SEARCH (SECONDARY) ══════════════════════════════════════════════════ */}
+                    <Animated.View entering={FadeInDown.duration(400).delay(200)} style={styles.searchSecondaryContainer}>
+                        <Pressable style={styles.searchSecondary} onPress={() => router.push('/(tabs)/search')}>
+                            <Ionicons name="search" size={20} color={Colors.gray400} />
+                            <Text style={styles.searchSecondaryInput}>Search doctors, clinics...</Text>
+                        </Pressable>
+                    </Animated.View>
+
+                    {/* [SECTION 6] ══ CLINIC LIST (REFINED) ══════════════════════════════════════════════════ */}
+                    <Animated.View entering={FadeInDown.duration(400).delay(250)} style={styles.clinicListSection}>
+                        <View style={{ gap: 16 }}>
+                            {clinics.map((clinic, i) => (
+                                <ClinicCard key={clinic.id} clinic={clinic} index={i} />
+                            ))}
                         </View>
+                    </Animated.View>
 
-                        {filteredClinics.length > 0 ? (
-                            <View style={{ gap: 16 }}>
-                                {filteredClinics.map((clinic, i) => (
-                                    <ClinicCard key={clinic.id} clinic={clinic} index={i} />
-                                ))}
-                            </View>
-                        ) : (
-                            <View style={styles.emptyState}>
-                                <Ionicons name="search-outline" size={32} color={Colors.gray400} />
-                                <Text style={styles.emptyText}>No clinics found</Text>
-                            </View>
-                        )}
-                    </View>
-
+                    {/* [SECTION 7] ══ TIME INTELLIGENCE STRIP ══════════════════════════════════════════════════ */}
+                    <Animated.View entering={FadeInDown.duration(400).delay(300)} style={styles.timeIntelligenceStrip}>
+                        <View style={styles.timeIntelHeader}>
+                            <Ionicons name="time" size={16} color={Colors.primary600} />
+                            <Text style={styles.timeIntelTitle}>Time Intelligence</Text>
+                        </View>
+                        <View style={styles.timeIntelRow}>
+                            <Text style={styles.timeIntelCondition}>If you go now</Text>
+                            <Ionicons name="arrow-forward" size={14} color={Colors.gray400} />
+                            <Text style={styles.timeIntelResultGood}>no wait</Text>
+                        </View>
+                        <View style={styles.timeIntelDivider} />
+                        <View style={styles.timeIntelRow}>
+                            <Text style={styles.timeIntelCondition}>If you go in 30 mins</Text>
+                            <Ionicons name="arrow-forward" size={14} color={Colors.gray400} />
+                            <Text style={styles.timeIntelResultBad}>25 min wait</Text>
+                        </View>
+                    </Animated.View>
                 </View>
             </ScrollView>
 
@@ -370,301 +373,488 @@ const styles = StyleSheet.create({
     pageStructure: {
         flexDirection: 'column',
     },
+    sectionContainer: {
+        marginBottom: 24,
+    },
 
-    // ── Header Section ─────────────────────────────────────────────────────
-    headerSection: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: Layout.spacing.space6,
+    // ── Section 1: System State Header ───────────────────────────
+    systemStateHeader: {
+        marginBottom: 32,
     },
     locationBlock: {
         flexDirection: 'column',
-        gap: 2,
-    },
-    locationLabel: {
-        fontFamily: 'Inter_500Medium',
-        fontSize: 12,
-        color: Colors.gray500,
     },
     locationCity: {
-        fontFamily: 'Inter_600SemiBold',
+        fontFamily: 'Inter_700Bold',
         fontSize: 16,
         color: Colors.textPrimary,
-    },
-    headerActions: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 16,
-    },
-    bellIcon: {
-        padding: 4,
+        padding: 8,
+        paddingLeft: 0,
     },
     avatar: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
+        width: 44,
+        height: 44,
+        borderRadius: 22,
         backgroundColor: Colors.gray200,
     },
-
-    // ── Greeting Section ───────────────────────────────────────────────────
-    greetingSection: {
-        marginBottom: Layout.spacing.space4,
-        gap: Layout.spacing.space2,
+    systemStateTitle: {
+        fontFamily: 'Inter_700Bold',
+        fontSize: 34,
+        color: Colors.state.live,
+        letterSpacing: -1,
     },
-    greetingHeading: {
+    systemStateSub: {
+        fontFamily: 'Inter_500Medium',
+        fontSize: 15,
+        color: Colors.gray600,
+        marginTop: 6,
+    },
+    commandWelcome: {
         fontFamily: 'Inter_700Bold',
         fontSize: 28,
         color: Colors.textPrimary,
         letterSpacing: -0.5,
     },
-    greetingSubtitle: {
-        fontFamily: 'Inter_400Regular',
-        fontSize: 14,
-        color: Colors.gray500,
+    commandStatus: {
+        fontFamily: 'Inter_500Medium',
+        fontSize: 15,
+        color: Colors.primary600,
+        marginTop: 4,
     },
-
-    // ── Search Component ───────────────────────────────────────────────────
-    searchComponent: {
-        height: 52,
-        borderRadius: 16,
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        backgroundColor: '#F5F7FB',
-        borderWidth: 1,
-        borderColor: '#E6EAF2',
+    activeMiniBadge: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 12,
-        marginBottom: Layout.spacing.space6,
+        gap: 6,
+        backgroundColor: Colors.state.live + '15',
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 12,
     },
-    searchInput: {
-        flex: 1,
-        fontFamily: 'Inter_400Regular',
-        fontSize: 16,
-        color: Colors.textPrimary,
-    },
-    filterButton: {
-        padding: 4,
+    activeMiniText: {
+        fontFamily: 'Inter_700Bold',
+        fontSize: 13,
+        color: Colors.state.live,
     },
 
-    // ── Live Wait Insight (Hero Card) ──────────────────────────────────────
-    insightCard: {
-        height: 120,
+    // ── Section 2: Hero Action Card ────────────────────────────────
+    heroActionCard: {
+        backgroundColor: Colors.state.live,
         borderRadius: 20,
-        padding: 20,
+        padding: 24,
+        marginBottom: 32,
+        shadowColor: Colors.state.live,
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.25,
+        shadowRadius: 16,
+    },
+    heroTitle: {
+        fontFamily: 'Inter_700Bold',
+        fontSize: 24,
+        color: '#FFFFFF',
+        marginBottom: 20,
+    },
+    heroStatsRow: {
         flexDirection: 'row',
-        gap: 16,
-        backgroundColor: Colors.surfaceBrand,
-        marginBottom: Layout.spacing.space8,
+        alignItems: 'center',
+        marginBottom: 24,
     },
-    insightCardLeft: {
-        flex: 1,
+    heroStatLabel: {
+        fontFamily: 'Inter_500Medium',
+        fontSize: 13,
+        color: 'rgba(255, 255, 255, 0.8)',
+        marginBottom: 4,
+    },
+    heroStatValue: {
+        fontFamily: 'Inter_700Bold',
+        fontSize: 18,
+        color: '#FFFFFF',
+    },
+    heroStatDivider: {
+        width: 1,
+        height: 32,
+        backgroundColor: 'rgba(255, 255, 255, 0.2)',
+        marginHorizontal: 20,
+    },
+    heroButton: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 12,
+        paddingVertical: 14,
+        alignItems: 'center',
         justifyContent: 'center',
-        gap: 4,
     },
-    insightCardRight: {
+    heroButtonText: {
+        fontFamily: 'Inter_700Bold',
+        fontSize: 15,
+        color: Colors.state.live,
+    },
+
+    // ── Active Queue Card (Hero Mode) ──────────────────────────────
+    activeQueueCard: {
+        borderRadius: 24,
+        overflow: 'hidden',
+        marginBottom: 32,
+        ...Platform.select({
+            ios: { shadowColor: Colors.primary500, shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.3, shadowRadius: 20 },
+            android: { elevation: 8 }
+        }),
+    },
+    activeCardGradient: {
+        padding: 24,
+    },
+    activeCardTop: {
+        marginBottom: 20,
+    },
+    activeCardStatus: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        marginBottom: 6,
+    },
+    activeStatusText: {
+        fontFamily: 'Inter_700Bold',
+        fontSize: 11,
+        color: Colors.textOnColor,
+        letterSpacing: 1,
+    },
+    activeClinicName: {
+        fontFamily: 'Inter_700Bold',
+        fontSize: 18,
+        color: Colors.textOnColor,
+    },
+    activeCardMain: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 24,
+    },
+    activePosCol: {
         flex: 1,
-        justifyContent: 'center',
-        alignItems: 'flex-start',
-        borderLeftWidth: 1,
-        borderLeftColor: 'rgba(38, 101, 140, 0.1)',
-        paddingLeft: 16,
-        gap: 4,
     },
-    insightCategoryLabel: {
+    activePosLabel: {
+        fontFamily: 'Inter_500Medium',
+        fontSize: 15,
+        color: 'rgba(255,255,255,0.7)',
+        marginBottom: 4,
+    },
+    activePosValue: {
+        ...Typography.numbers,
+        fontSize: 48,
+        lineHeight: 56,
+        color: Colors.textOnColor,
+    },
+    activeMetaCol: {
+        gap: 8,
+    },
+    activeMetaRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        backgroundColor: 'rgba(255,255,255,0.1)',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 10,
+    },
+    activeMetaText: {
+        fontFamily: 'Inter_600SemiBold',
+        fontSize: 13,
+        color: '#FFFFFF',
+    },
+    activeActionBox: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255,255,255,0.15)',
+        padding: 16,
+        borderRadius: 16,
+    },
+    activeCountdown: {
+    },
+    countdownLabel: {
         fontFamily: 'Inter_500Medium',
         fontSize: 12,
-        color: Colors.primary700,
-        opacity: 0.8,
+        color: 'rgba(255,255,255,0.7)',
     },
-    insightBigNum: {
+    countdownValue: {
         fontFamily: 'Inter_700Bold',
-        fontSize: 36,
-        color: Colors.primary700,
-        letterSpacing: -1,
+        fontSize: 18,
+        color: '#FFFFFF',
     },
-    insightAvgNum: {
-        fontFamily: 'Inter_700Bold',
-        fontSize: 22,
-        color: Colors.primary700,
-    },
-    insightSublabel: {
-        fontFamily: 'Inter_600SemiBold',
-        fontSize: 13,
-        color: Colors.success700,
-    },
-    insightClinicsOpen: {
-        fontFamily: 'Inter_500Medium',
-        fontSize: 13,
-        color: Colors.primary600,
-    },
-
-    // ── Emergency Card ─────────────────────────────────────────────────────
-    emergencyCard: {
-        borderRadius: 16,
-        padding: 16,
-        backgroundColor: Colors.error100, // #FFF1F2
+    activeViewBtn: {
+        backgroundColor: '#FFFFFF',
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'space-between',
-        marginBottom: Layout.spacing.space6,
-    },
-    emergencyLeft: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 12,
-    },
-    emergencyIconWrap: {
-        width: 36,
-        height: 36,
-        borderRadius: 10,
-        backgroundColor: '#FEE2E2', // matching user specs
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    emergencyTitle: {
-        fontFamily: 'Inter_600SemiBold',
-        fontSize: 15,
-        color: Colors.error700,
-    },
-    emergencySubtitle: {
-        fontFamily: 'Inter_500Medium',
-        fontSize: 13,
-        color: Colors.error500,
-    },
-
-    // ── Specialty Filters ──────────────────────────────────────────────────
-    specialtySection: {
-        marginBottom: Layout.spacing.space6,
-        gap: 12,
-    },
-    chipsScrollContainer: {
-        flexDirection: 'row',
-        gap: 10,
-        paddingRight: 20,
-    },
-    chipDefault: {
-        height: 40,
-        borderRadius: 12,
+        gap: 6,
         paddingHorizontal: 16,
-        paddingVertical: 8,
-        backgroundColor: '#F3F4F6',
+        paddingVertical: 10,
+        borderRadius: 12,
+    },
+    activeViewText: {
+        fontFamily: 'Inter_700Bold',
+        fontSize: 14,
+        color: Colors.primary700,
+    },
+    delayAlert: {
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'center',
+        gap: 8,
+        marginTop: 16,
+        backgroundColor: 'rgba(0,0,0,0.2)',
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 10,
     },
-    chipSelected: {
-        backgroundColor: Colors.primary500, // #4F6EF7 approx
-    },
-    chipTextDefault: {
-        fontFamily: 'Inter_500Medium',
-        fontSize: 14,
-        color: Colors.gray700,
-    },
-    chipTextSelected: {
-        color: Colors.surfacePrimary,
+    delayText: {
+        fontFamily: 'Inter_600SemiBold',
+        fontSize: 12,
+        color: '#FFFFFF',
     },
 
-    // ── Nearby Clinics ─────────────────────────────────────────────────────
-    nearbySection: {
-        gap: Layout.spacing.space3,
-    },
-    sectionHeaderRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: Layout.spacing.space2,
-    },
-    sectionTitle: {
+    // ── Section 3: Best Option ─────────────────────────────────────
+    sectionTitleSmall: {
         fontFamily: 'Inter_600SemiBold',
         fontSize: 16,
         color: Colors.textPrimary,
+        marginBottom: 12,
     },
-    seeAllText: {
-        fontFamily: 'Inter_500Medium',
-        fontSize: 14,
-        color: Colors.primary500,
-    },
-    
-    // Clinic Card
-    clinicCard: {
-        height: 96,
-        borderRadius: 16,
-        padding: 12,
+    bestOptionCard: {
         backgroundColor: Colors.surfacePrimary,
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 12,
+        borderRadius: 16,
+        padding: 16,
         borderWidth: 1,
         borderColor: Colors.gray200,
     },
-    clinicCardImage: {
-        width: 72,
-        height: 72,
-        borderRadius: 12,
-        backgroundColor: Colors.gray100,
-    },
-    clinicCardInfo: {
-        flex: 1,
-        flexDirection: 'column',
-        justifyContent: 'center',
-        gap: 4,
-    },
-    clinicCardName: {
-        fontFamily: 'Inter_600SemiBold',
-        fontSize: 15,
+    bestOptionName: {
+        fontFamily: 'Inter_700Bold',
+        fontSize: 16,
         color: Colors.textPrimary,
+        marginBottom: 4,
     },
-    clinicCardDoctor: {
+    bestOptionMeta: {
         fontFamily: 'Inter_500Medium',
         fontSize: 13,
-        color: Colors.textSecondary,
+        color: Colors.gray600,
     },
-    clinicCardMetaRow: {
+    bestOptionWaitPill: {
+        backgroundColor: '#F1F5F9',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 8,
+    },
+    bestOptionWaitText: {
+        fontFamily: 'Inter_600SemiBold',
+        fontSize: 12,
+        color: Colors.gray800,
+    },
+    bestOptionContextRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        marginTop: 16,
+        marginBottom: 16,
+    },
+    bestOptionLeaveText: {
+        fontFamily: 'Inter_500Medium',
+        fontSize: 13,
+        color: Colors.gray800,
+    },
+    bestOptionButton: {
+        backgroundColor: Colors.surfacePrimary,
+        borderWidth: 1,
+        borderColor: Colors.state.live,
+        borderRadius: 12,
+        paddingVertical: 12,
+        alignItems: 'center',
+    },
+    bestOptionButtonText: {
+        fontFamily: 'Inter_600SemiBold',
+        fontSize: 14,
+        color: Colors.state.live,
+    },
+
+    // ── Section 4: Emergency Access ────────────────────────────────
+    emergencyAccessCard: {
+        backgroundColor: '#FEF2F2',
+        borderRadius: 16,
+        padding: 16,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        borderWidth: 1,
+        borderColor: '#FEE2E2',
+    },
+    emergencyIconWrap: {
+        width: 32,
+        height: 32,
+        backgroundColor: '#FEE2E2',
+        borderRadius: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    emergencyAccessText: {
+        fontFamily: 'Inter_600SemiBold',
+        fontSize: 14,
+        color: Colors.state.emergency,
+    },
+    emergencyAccessBtn: {
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        backgroundColor: '#FFFFFF',
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#FECACA',
+    },
+    emergencyAccessBtnText: {
+        fontFamily: 'Inter_600SemiBold',
+        fontSize: 12,
+        color: Colors.state.emergency,
+    },
+
+    // ── Section 5: Search ──────────────────────────────────────────
+    searchSecondaryContainer: {
+        marginBottom: 32,
+    },
+    searchSecondary: {
+        height: 48,
+        borderRadius: 12,
+        paddingHorizontal: 16,
+        backgroundColor: '#F1F5F9',
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+    },
+    searchSecondaryInput: {
+        fontFamily: 'Inter_500Medium',
+        fontSize: 15,
+        color: Colors.gray400,
+    },
+
+    // ── Section 6: Clinic List (Refined) ───────────────────────────
+    clinicListSection: {
+        marginBottom: 32,
+    },
+    refinedClinicCard: {
+        backgroundColor: Colors.surfacePrimary,
+        borderRadius: 16,
+        padding: 16,
+        borderWidth: 1,
+        borderColor: Colors.gray200,
+    },
+    refinedClinicName: {
+        fontFamily: 'Inter_600SemiBold',
+        fontSize: 17,
+        color: Colors.textPrimary,
+        marginBottom: 8,
+    },
+    refinedClinicStateRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    refinedClinicStateDot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+    },
+    refinedClinicStateText: {
+        fontFamily: 'Inter_600SemiBold',
+        fontSize: 13,
+    },
+    refinedClinicServing: {
+        fontFamily: 'Inter_500Medium',
+        fontSize: 13,
+        color: Colors.gray500,
+    },
+    refinedClinicTag: {
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 6,
+    },
+    refinedClinicTagText: {
+        fontFamily: 'Inter_700Bold',
+        fontSize: 10,
+        textTransform: 'uppercase',
+    },
+    refinedClinicPredictBox: {
+        marginTop: 16,
+        paddingTop: 16,
+        borderTopWidth: 1,
+        borderTopColor: Colors.gray100,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    refinedClinicPredictLine: {
+        fontFamily: 'Inter_500Medium',
+        fontSize: 13,
+        color: Colors.gray600,
+        marginBottom: 2,
+    },
+    refinedClinicPredictTime: {
+        fontFamily: 'Inter_600SemiBold',
+        fontSize: 14,
+        color: Colors.state.live,
+    },
+    refinedClinicActionBtn: {
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        backgroundColor: '#F8FAFC',
+        borderRadius: 8,
+    },
+    refinedClinicActionText: {
+        fontFamily: 'Inter_600SemiBold',
+        fontSize: 13,
+        color: Colors.textPrimary,
+    },
+
+    // ── Section 7: Time Intelligence Strip ─────────────────────────
+    timeIntelligenceStrip: {
+        backgroundColor: '#F0F9FF',
+        borderRadius: 16,
+        padding: 16,
+        borderWidth: 1,
+        borderColor: '#BAE6FD',
+    },
+    timeIntelHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        marginBottom: 16,
+    },
+    timeIntelTitle: {
+        fontFamily: 'Inter_700Bold',
+        fontSize: 14,
+        color: Colors.primary700,
+    },
+    timeIntelRow: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
     },
-    clinicCardMetaText: {
+    timeIntelCondition: {
         fontFamily: 'Inter_500Medium',
-        fontSize: 12,
-        color: Colors.gray500,
+        fontSize: 13,
+        color: Colors.gray700,
     },
-    waitBadge: {
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 10,
-        backgroundColor: '#E8F9F0',
+    timeIntelResultGood: {
+        fontFamily: 'Inter_700Bold',
+        fontSize: 13,
+        color: '#059669', // Emerald 600
     },
-    waitBadgeText: {
-        fontFamily: 'Inter_600SemiBold',
-        fontSize: 11,
-        color: '#16A34A',
+    timeIntelResultBad: {
+        fontFamily: 'Inter_700Bold',
+        fontSize: 13,
+        color: Colors.state.booking, 
     },
-    predictText: {
-        fontFamily: 'Inter_500Medium',
-        fontSize: 11,
-        color: Colors.primary500,
-        marginTop: 2,
-    },
-    
-    // Empty state
-    emptyState: {
-        alignItems: 'center',
-        padding: 40,
-        gap: 12,
-    },
-    emptyText: {
-        fontFamily: 'Inter_500Medium',
-        fontSize: 15,
-        color: Colors.gray500,
+    timeIntelDivider: {
+        height: 1,
+        backgroundColor: '#E0F2FE',
+        marginVertical: 12,
     },
 
-    // ── Modal ──────────────────────────────────────────────────────────────
+    // ── Shared Modal Styles ────────────────────────────────────────
     modalOverlay: {
         flex: 1,
-        backgroundColor: 'rgba(15, 23, 42, 0.4)',
+        backgroundColor: 'rgba(0,0,0,0.5)',
         justifyContent: 'flex-end',
     },
     modalSheet: {
@@ -673,24 +863,26 @@ const styles = StyleSheet.create({
         borderTopRightRadius: 24,
         padding: 24,
         paddingBottom: 40,
-        gap: 8,
     },
     modalTitle: {
         fontFamily: 'Inter_700Bold',
         fontSize: 18,
         color: Colors.textPrimary,
-        marginBottom: 8,
+        marginBottom: 16,
     },
     modalOption: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
         alignItems: 'center',
-        paddingVertical: 14,
-        paddingHorizontal: 16,
-        borderRadius: 12,
+        justifyContent: 'space-between',
+        paddingVertical: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: Colors.gray100,
     },
     modalOptionActive: {
         backgroundColor: Colors.primary100,
+        marginHorizontal: -24,
+        paddingHorizontal: 24,
+        borderBottomColor: 'transparent',
     },
     modalOptionText: {
         fontFamily: 'Inter_500Medium',
@@ -699,6 +891,6 @@ const styles = StyleSheet.create({
     },
     modalOptionTextActive: {
         fontFamily: 'Inter_600SemiBold',
-        color: Colors.primary500,
+        color: Colors.primary600,
     },
 });

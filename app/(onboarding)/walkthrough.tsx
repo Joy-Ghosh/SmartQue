@@ -85,7 +85,7 @@ export default function WalkthroughScreen() {
                 return (
                     <Animated.View key="step1" entering={FadeIn.duration(400)} exiting={SlideOutLeft} style={styles.content}>
                         <View style={styles.iconContainer}>
-                            <Ionicons name="hand-right-outline" size={80} color={Colors.primary} />
+                            <Ionicons name="hand-right-outline" size={80} color={Colors.primary500} />
                         </View>
                         <Text style={styles.title}>Health speaks your language.</Text>
                         <Text style={styles.subtitle}>Choose your preferred language to continue.</Text>
@@ -117,11 +117,11 @@ export default function WalkthroughScreen() {
                     <Animated.View key="step2" entering={SlideInRight} exiting={SlideOutLeft} style={styles.content}>
                         <View style={styles.illustrationWrap}>
                             <View style={styles.iconCircle}>
-                                <Ionicons name="home-outline" size={40} color={Colors.primary} />
+                                <Ionicons name="home-outline" size={40} color={Colors.primary500} />
                             </View>
                             <View style={styles.dashedLine} />
-                            <View style={[styles.iconCircle, { backgroundColor: Colors.secondary + '20' }]}>
-                                <Ionicons name="medical-outline" size={40} color={Colors.secondary} />
+                            <View style={[styles.iconCircle, { backgroundColor: Colors.primary200 }]}>
+                                <Ionicons name="medical-outline" size={40} color={Colors.primary700} />
                             </View>
                         </View>
                         <View style={{ flex: 1, justifyContent: 'center', paddingBottom: 60 }}>
@@ -179,7 +179,7 @@ export default function WalkthroughScreen() {
                     <Animated.View key="step5" entering={SlideInRight} exiting={FadeOut} style={styles.content}>
                         <View style={{ flex: 1, justifyContent: 'center' }}>
                             <View style={styles.iconContainerCenter}>
-                                <Ionicons name="pulse" size={60} color={Colors.primary} />
+                                <Ionicons name="pulse" size={60} color={Colors.primary500} />
                             </View>
                             <Text style={[styles.title, { textAlign: 'center' }]}>How can we help you right now?</Text>
                             <Text style={[styles.subtitle, { textAlign: 'center', marginBottom: 40 }]}>
@@ -195,7 +195,7 @@ export default function WalkthroughScreen() {
                                 onPress={handleFinishNormal}
                             >
                                 <View style={[styles.triageIconWrap, { backgroundColor: '#fff' }]}>
-                                    <Ionicons name="calendar-outline" size={28} color={Colors.primary} />
+                                    <Ionicons name="calendar-outline" size={28} color={Colors.primary500} />
                                 </View>
                                 <View style={styles.triageTextWrap}>
                                     <Text style={[styles.triageTitle, { color: '#fff' }]}>Schedule a Visit</Text>
@@ -213,13 +213,13 @@ export default function WalkthroughScreen() {
                                 onPress={handleFinishEmergency}
                             >
                                 <View style={[styles.triageIconWrap, { backgroundColor: 'rgba(239,68,68,0.15)' }]}>
-                                    <Ionicons name="medical" size={28} color={Colors.medicalRed} />
+                                    <Ionicons name="medical" size={28} color={Colors.error500} />
                                 </View>
                                 <View style={styles.triageTextWrap}>
-                                    <Text style={[styles.triageTitle, { color: Colors.medicalRed }]}>Emergency Care</Text>
+                                    <Text style={[styles.triageTitle, { color: Colors.error500 }]}>Emergency Care</Text>
                                     <Text style={[styles.triageSub, { color: Colors.textSecondary }]}>Immediate ER routing</Text>
                                 </View>
-                                <Ionicons name="warning-outline" size={24} color={Colors.medicalRed} />
+                                <Ionicons name="warning-outline" size={24} color={Colors.error500} />
                             </Pressable>
                         </View>
                     </Animated.View>
@@ -236,8 +236,8 @@ export default function WalkthroughScreen() {
                 style={StyleSheet.absoluteFill}
             />
             {/* Soft geometric blobs */}
-            <View style={[styles.blob, { top: -100, right: -50, backgroundColor: Colors.primary + '08' }]} />
-            <View style={[styles.blob, { bottom: -100, left: -50, backgroundColor: Colors.secondary + '08' }]} />
+            <View style={[styles.blob, { top: -100, right: -50, backgroundColor: Colors.primary100 }]} />
+            <View style={[styles.blob, { bottom: -100, left: -50, backgroundColor: Colors.primary100 }]} />
 
             <View style={styles.inner}>
                 {/* Minimalist Progress Indicator */}
@@ -290,11 +290,11 @@ const styles = StyleSheet.create({
         borderRadius: 2,
     },
     progressSegActive: {
-        backgroundColor: Colors.primary,
+        backgroundColor: Colors.primary500,
         width: 32,
     },
     progressSegDone: {
-        backgroundColor: Colors.primary + '50',
+        backgroundColor: Colors.primary300,
     },
     content: {
         flex: 1,
@@ -335,8 +335,8 @@ const styles = StyleSheet.create({
         backgroundColor: '#fff',
     },
     langButtonActive: {
-        backgroundColor: Colors.primary,
-        borderColor: Colors.primary,
+        backgroundColor: Colors.primary500,
+        borderColor: Colors.primary500,
     },
     langButtonText: {
         fontFamily: 'Inter_500Medium',
@@ -358,7 +358,7 @@ const styles = StyleSheet.create({
         width: 80,
         height: 80,
         borderRadius: 40,
-        backgroundColor: Colors.primary + '15',
+        backgroundColor: Colors.primary100,
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -388,7 +388,7 @@ const styles = StyleSheet.create({
         width: 16,
         height: 16,
         borderRadius: 8,
-        backgroundColor: Colors.primary,
+        backgroundColor: Colors.primary500,
         borderWidth: 3,
         borderColor: '#fff',
     },
@@ -397,7 +397,7 @@ const styles = StyleSheet.create({
         width: 48,
         height: 48,
         borderRadius: 24,
-        backgroundColor: Colors.primary,
+        backgroundColor: Colors.primary500,
     },
     actionContainer: {
         gap: 16,
@@ -415,7 +415,7 @@ const styles = StyleSheet.create({
         position: 'absolute',
         top: 20,
         right: 40,
-        backgroundColor: Colors.medicalRed,
+        backgroundColor: Colors.error500,
         paddingHorizontal: 16,
         paddingVertical: 8,
         borderRadius: 20,
@@ -435,7 +435,7 @@ const styles = StyleSheet.create({
         ...Colors.shadows.sm,
     },
     triageCardPrimary: {
-        backgroundColor: Colors.primary,
+        backgroundColor: Colors.primary500,
     },
     triageCardDanger: {
         backgroundColor: '#fff',

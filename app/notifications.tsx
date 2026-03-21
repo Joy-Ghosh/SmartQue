@@ -57,9 +57,9 @@ export default function NotificationsScreen() {
 
     const getColor = (type: string) => {
         switch (type) {
-            case 'alert': return Colors.medicalRed;
-            case 'success': return Colors.success;
-            case 'info': return Colors.primary;
+            case 'alert': return Colors.error500;
+            case 'success': return Colors.success500;
+            case 'info': return Colors.primary500;
             default: return Colors.textMuted;
         }
     };
@@ -146,7 +146,7 @@ const styles = StyleSheet.create({
     unreadCard: {
         backgroundColor: '#F8FAFC', // Slightly different bg for unread? Or keep white but add dot
         borderLeftWidth: 3,
-        borderLeftColor: Colors.primary,
+        borderLeftColor: Colors.primary500,
     },
     iconContainer: {
         width: 44,
@@ -184,7 +184,7 @@ const styles = StyleSheet.create({
         width: 8,
         height: 8,
         borderRadius: 4,
-        backgroundColor: Colors.medicalRed,
+        backgroundColor: Colors.error500,
         position: 'absolute',
         top: 16,
         right: 16,

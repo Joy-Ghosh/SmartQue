@@ -5,6 +5,8 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import Colors from '@/constants/colors';
+import { Layout } from '@/constants/layout';
+import { Typography } from '@/constants/styles';
 import { useQueue } from '@/lib/queue-context';
 import { GlassView } from '@/components/ui/GlassView';
 import { StatusBadge } from '@/components/ui/StatusBadge';
@@ -66,8 +68,8 @@ export default function AppointmentsScreen() {
                                 >
                                     <View style={styles.activeCardHeader}>
                                         <View style={styles.activeTag}>
-                                            <View style={[styles.activeDot, activeBooking.isEmergency && { backgroundColor: Colors.danger }]} />
-                                            <Text style={[styles.activeTagText, activeBooking.isEmergency && { color: Colors.danger }]}>
+                                            <View style={[styles.activeDot, activeBooking.isEmergency && { backgroundColor: Colors.error500 }]} />
+                                            <Text style={[styles.activeTagText, activeBooking.isEmergency && { color: Colors.error500 }]}>
                                                 {activeBooking.isEmergency ? 'EMERGENCY' : 'LIVE NOW'}
                                             </Text>
                                         </View>
@@ -107,11 +109,11 @@ export default function AppointmentsScreen() {
                             pastBookings.map((booking, index) => (
                                 <GlassView key={index} style={styles.historyCard} intensity={40} border>
                                     <View style={styles.cardLeft}>
-                                        <View style={[styles.historyIcon, booking.isEmergency && { backgroundColor: Colors.dangerBg }]}>
+                                        <View style={[styles.historyIcon, booking.isEmergency && { backgroundColor: Colors.error100 }]}>
                                             <Ionicons
                                                 name={booking.isEmergency ? "medical" : "checkmark"}
                                                 size={18}
-                                                color={booking.isEmergency ? Colors.danger : Colors.success}
+                                                color={booking.isEmergency ? Colors.error500 : Colors.success500}
                                             />
                                         </View>
                                         <View>
@@ -142,7 +144,7 @@ export default function AppointmentsScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: Colors.background,
+        backgroundColor: Colors.surfaceSecondary,
     },
     header: {
         flexDirection: 'row',
@@ -155,7 +157,7 @@ const styles = StyleSheet.create({
         width: 40,
         height: 40,
         borderRadius: 20,
-        backgroundColor: '#fff',
+        backgroundColor: Colors.surfacePrimary,
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 1,
@@ -172,7 +174,7 @@ const styles = StyleSheet.create({
     },
     segmentTrack: {
         flexDirection: 'row',
-        backgroundColor: '#fff',
+        backgroundColor: Colors.surfacePrimary,
         padding: 4,
         borderRadius: 16,
         borderWidth: 1,
@@ -185,7 +187,7 @@ const styles = StyleSheet.create({
         borderRadius: 12,
     },
     segmentBtnActive: {
-        backgroundColor: Colors.background,
+        backgroundColor: Colors.surfaceSecondary,
         ...Colors.shadows.sm,
     },
     segmentText: {
@@ -215,7 +217,7 @@ const styles = StyleSheet.create({
         marginBottom: 20,
     },
     activeTag: {
-        backgroundColor: '#fff',
+        backgroundColor: Colors.surfacePrimary,
         flexDirection: 'row',
         alignItems: 'center',
         gap: 6,
@@ -227,23 +229,23 @@ const styles = StyleSheet.create({
         width: 6,
         height: 6,
         borderRadius: 3,
-        backgroundColor: Colors.primary,
+        backgroundColor: Colors.primary500,
     },
     activeTagText: {
         fontSize: 10,
         fontFamily: 'Inter_700Bold',
-        color: Colors.primary,
+        color: Colors.primary500,
     },
     activeClinic: {
         fontSize: 14,
         fontFamily: 'Inter_500Medium',
-        color: 'rgba(255,255,255,0.8)',
+        color: Colors.textOnColorSecondary,
         marginBottom: 4,
     },
     activeDoctor: {
         fontSize: 20,
         fontFamily: 'Inter_700Bold',
-        color: '#fff',
+        color: Colors.textOnColor,
         marginBottom: 24,
     },
     tokenRow: {
@@ -251,19 +253,20 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         paddingTop: 20,
         borderTopWidth: 1,
-        borderTopColor: 'rgba(255,255,255,0.2)',
+        borderTopColor: 'rgba(255,255,255,0.15)',
     },
     tokenLabel: {
         fontSize: 10,
         fontFamily: 'Inter_600SemiBold',
-        color: 'rgba(255,255,255,0.7)',
+        color: Colors.textOnColorSecondary,
         letterSpacing: 1,
         marginBottom: 2,
     },
     tokenValue: {
+        ...Typography.numbers,
         fontSize: 24,
-        fontFamily: 'Inter_700Bold',
-        color: '#fff',
+        lineHeight: 30,
+        color: Colors.textOnColor,
     },
     servingInfo: {
         alignItems: 'flex-end',
@@ -271,13 +274,13 @@ const styles = StyleSheet.create({
     servingLabel: {
         fontSize: 12,
         fontFamily: 'Inter_500Medium',
-        color: 'rgba(255,255,255,0.8)',
+        color: Colors.textOnColorSecondary,
         marginBottom: 2,
     },
     servingValue: {
+        fontFamily: 'Inter_700Bold',
         fontSize: 18,
-        fontFamily: 'Inter_600SemiBold',
-        color: '#fff',
+        color: Colors.textOnColor,
     },
     // History Card
     historyCard: {
@@ -286,7 +289,7 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         padding: 16,
         borderRadius: 16,
-        backgroundColor: '#fff',
+        backgroundColor: Colors.surfacePrimary,
     },
     cardLeft: {
         flexDirection: 'row',
@@ -297,7 +300,7 @@ const styles = StyleSheet.create({
         width: 40,
         height: 40,
         borderRadius: 12,
-        backgroundColor: Colors.successBg,
+        backgroundColor: Colors.success100,
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -335,7 +338,7 @@ const styles = StyleSheet.create({
         width: 60,
         height: 60,
         borderRadius: 30,
-        backgroundColor: Colors.primaryBg,
+        backgroundColor: Colors.primary100,
         alignItems: 'center',
         justifyContent: 'center',
     },

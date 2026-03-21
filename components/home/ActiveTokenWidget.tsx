@@ -95,9 +95,9 @@ const styles = StyleSheet.create({
         marginHorizontal: 20,
         marginBottom: 16,
         gap: 12,
-        ...Colors.shadowMd,
+        ...Colors.shadows.md,
         borderWidth: 2,
-        borderColor: Colors.primary,
+        borderColor: Colors.primary500,
     },
     header: {
         flexDirection: 'row',
@@ -113,12 +113,12 @@ const styles = StyleSheet.create({
         width: 8,
         height: 8,
         borderRadius: 4,
-        backgroundColor: '#2EC4B6',
+        backgroundColor: Colors.success500,
     },
     liveText: {
         fontFamily: 'Inter_700Bold',
         fontSize: 11,
-        color: '#2EC4B6',
+        color: Colors.success500,
         letterSpacing: 0.5,
     },
     tokenRow: {
@@ -138,12 +138,12 @@ const styles = StyleSheet.create({
     tokenNumber: {
         fontFamily: 'Inter_700Bold',
         fontSize: 24,
-        color: Colors.primary,
+        color: Colors.primary500,
     },
     currentNumber: {
         fontFamily: 'Inter_700Bold',
         fontSize: 24,
-        color: Colors.secondary,
+        color: Colors.primary300,
     },
     progressContainer: {
         flex: 1,
@@ -157,7 +157,7 @@ const styles = StyleSheet.create({
     },
     progressFill: {
         height: '100%',
-        backgroundColor: Colors.secondary,
+        backgroundColor: Colors.primary500,
         borderRadius: 3,
     },
     aheadText: {

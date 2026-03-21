@@ -29,14 +29,13 @@ export function QueueProvider({ children }: { children: ReactNode }) {
   const [pastBookings, setPastBookings] = useState<ActiveBooking[]>([]);
 
   const updateServingToken = (token: number) => {
-    setActiveBooking((prev) => {
-      if (!prev) return null;
-      if (token >= prev.tokenNumber) {
-        setPastBookings((old) => [prev, ...old]);
-        return null;
-      }
-      return { ...prev, servingToken: token };
-    });
+    if (!activeBooking) return;
+    if (token >= activeBooking.tokenNumber) {
+      setPastBookings((old) => [activeBooking, ...old]);
+      setActiveBooking(null);
+    } else {
+      setActiveBooking({ ...activeBooking, servingToken: token });
+    }
   };
 
   const snoozeBooking = () => {
@@ -47,12 +46,10 @@ export function QueueProvider({ children }: { children: ReactNode }) {
   };
 
   const cancelBooking = () => {
-    setActiveBooking((prev) => {
-      if (prev) {
-        setPastBookings((old) => [{ ...prev }, ...old]);
-      }
-      return null;
-    });
+    if (activeBooking) {
+      setPastBookings((old) => [activeBooking, ...old]);
+      setActiveBooking(null);
+    }
   };
 
   const value = useMemo(

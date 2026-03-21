@@ -25,53 +25,79 @@ import Animated, {
   ZoomIn,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
-import { LinearGradient } from 'expo-linear-gradient';
 import Colors from '@/constants/colors';
+import { Typography } from '@/constants/styles';
+import { Motion } from '@/constants/motion';
 import { useQueue } from '@/lib/queue-context';
-import { GlassView } from '@/components/ui/GlassView';
 import { GradientButton } from '@/components/ui/GradientButton';
+import { AnimatedButton } from '@/components/AnimatedButton';
+import { CountUp } from '@/components/CountUp';
 
 type QueueState = 'relax' | 'alert' | 'arrived' | 'emergency';
 const { width } = Dimensions.get('window');
 
+// Queue bubble visualization
+function QueueVisualization({ total, current, yours }: { total: number; current: number; yours: number }) {
+  const dots = [];
+  const maxDots = Math.min(10, yours - current + 2);
+  for (let i = 0; i < maxDots; i++) {
+     if (i === 0) {
+       // serving
+       dots.push(<View key={i} style={[styles.qDot, styles.qDotServing]} />);
+     } else if (i === maxDots - 1) {
+       // you
+       dots.push(<View key={i} style={[styles.qDot, styles.qDotYou]} />);
+     } else {
+       // ahead
+       dots.push(<View key={i} style={[styles.qDot, styles.qDotAhead]} />);
+     }
+  }
+
+  return (
+    <View style={styles.qVizContainer}>
+       <View style={styles.qVizRow}>
+           {dots}
+       </View>
+       <View style={styles.qVizLabels}>
+           <Text style={styles.qVizLabel}>Serving</Text>
+           <Text style={styles.qVizLabel}>You</Text>
+       </View>
+    </View>
+  );
+}
+
 export default function ActiveTokenScreen() {
   const insets = useSafeAreaInsets();
-  const { activeBooking, updateServingToken, snoozeBooking, cancelBooking } = useQueue();
-  const [isOnMyWay, setIsOnMyWay] = useState(false);
+  const { activeBooking, updateServingToken, cancelBooking } = useQueue();
 
-  const progressWidth = useSharedValue(0);
   const pulseScale = useSharedValue(1);
+  const dotOpacity = useSharedValue(1);
 
   const calculations = useMemo(() => {
     if (!activeBooking) return null;
     const peopleBefore = activeBooking.tokenNumber - activeBooking.servingToken;
     const totalWait = peopleBefore * activeBooking.avgWaitTime;
-    const timeToLeave = totalWait - activeBooking.travelTime - 10;
-    const progress = peopleBefore <= 0 ? 1 : Math.min(1, 1 - peopleBefore / (activeBooking.tokenNumber));
+    const timeToLeave = totalWait - activeBooking.travelTime - 5;
 
     let state: QueueState = 'relax';
     if (activeBooking.isEmergency) state = 'emergency';
     else if (timeToLeave <= 0) state = 'arrived';
     else if (timeToLeave <= 15) state = 'alert';
 
-    return { peopleBefore, totalWait, timeToLeave, progress, state };
+    return { peopleBefore, totalWait, timeToLeave, state };
   }, [activeBooking]);
 
   useEffect(() => {
-    if (calculations) {
-      progressWidth.value = withTiming(calculations.progress, { duration: 800, easing: Easing.out(Easing.cubic) });
-    }
-  }, [calculations?.progress]);
+    dotOpacity.value = withRepeat(
+      withSequence(withTiming(0.4, { duration: 800 }), withTiming(1, { duration: 800 })),
+      -1,
+      false
+    );
+  }, []);
 
   useEffect(() => {
     if (calculations?.state === 'alert' || calculations?.state === 'emergency') {
-      pulseScale.value = withRepeat(
-        withSequence(withTiming(1.05, { duration: 600 }), withTiming(1, { duration: 600 })),
-        -1,
-        true,
-      );
-    } else {
-      pulseScale.value = withSpring(1);
+         if (Platform.OS !== 'web' && calculations?.state === 'alert') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     }
   }, [calculations?.state]);
 
@@ -80,409 +106,271 @@ export default function ActiveTokenScreen() {
     if (!activeBooking) return;
     const interval = setInterval(() => {
       updateServingToken(activeBooking.servingToken + 1);
-      if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    }, 5000);
+      if (Platform.OS !== 'web') {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+    }, 15000); // 15 seconds skip for testing
     return () => clearInterval(interval);
-  }, [activeBooking?.servingToken]);
+  }, [activeBooking?.servingToken, updateServingToken]);
 
-  const progressBarStyle = useAnimatedStyle(() => ({ width: `${progressWidth.value * 100}%` as any }));
-  const cardPulseStyle = useAnimatedStyle(() => ({ transform: [{ scale: pulseScale.value }] }));
+  const liveDotStyle = useAnimatedStyle(() => ({ opacity: dotOpacity.value }));
 
   const handleCancel = useCallback(() => {
-    Alert.alert('Cancel Queue', 'Are you sure you want to leave the queue?', [
+    Alert.alert('Cancel Position', 'Are you sure you want to leave the queue?', [
       { text: 'Stay', style: 'cancel' },
-      { text: 'Leave Queue', style: 'destructive', onPress: () => { cancelBooking(); router.back(); } },
+      { text: 'Leave Queue', style: 'destructive', onPress: () => { 
+          cancelBooking(); 
+          if (router.canGoBack()) router.back();
+          else router.replace('/');
+      } },
     ]);
   }, [cancelBooking]);
 
-  const handleSnooze = useCallback(() => {
-    snoozeBooking();
-    if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-  }, [snoozeBooking]);
-
   if (!activeBooking || !calculations) {
     return (
-      <View style={[styles.container, styles.centerContent]}>
-        <View style={styles.emptyState}>
-          <Ionicons name="ticket-outline" size={64} color={Colors.textMuted} />
-          <Text style={styles.emptyTitle}>No Active Queue</Text>
-          <Text style={styles.emptySub}>Join a clinic queue to see your token status.</Text>
-          <GradientButton title="Find Clinics" onPress={() => router.back()} style={{ marginTop: 20 }} />
-        </View>
+      <View style={[styles.container, {justifyContent:'center', alignItems: 'center'}]}>
+          <Text style={{fontFamily: 'Inter_700Bold'}}>No Active Queue</Text>
+          <GradientButton title="Go Back" onPress={() => router.canGoBack() ? router.back() : router.replace('/')} style={{marginTop: 20}}/>
       </View>
-    )
+    );
   }
 
-  const stateColors = {
-    relax: { bg: ['#E0F2FE', '#F8FAFC'], accent: Colors.primary, text: Colors.primary },
-    alert: { bg: ['#FFF7ED', '#FFF'], accent: Colors.smartAmber, text: '#9A3412' },
-    arrived: { bg: ['#ECFDF5', '#FFF'], accent: Colors.confidenceGreen, text: '#065F46' },
-    emergency: { bg: ['#FEF2F2', '#FFF'], accent: Colors.medicalRed, text: Colors.medicalRed },
-  };
+  const isEmergency = activeBooking.isEmergency;
+  const isAlert = calculations.state === 'alert' || calculations.state === 'arrived' || isEmergency;
+  const isUrgent = calculations.peopleBefore < 2;
 
-  const currentState = stateColors[calculations.state];
-  const stateMessages = {
-    relax: { title: 'Relax at home', sub: 'You have wait time available.' },
-    alert: { title: 'Leave Now!', sub: `Start moving to reach on time.` },
-    arrived: { title: 'Almost There!', sub: 'Your turn is coming up very soon.' },
-    emergency: { title: 'Emergency Priority', sub: 'Priority queue active. Proceed immediately.' },
-  };
-  const msg = stateMessages[calculations.state];
+  // Urgent Motion
+  const shakeOffset = useSharedValue(0);
+  useEffect(() => {
+    if (isUrgent) {
+      shakeOffset.value = withSequence(
+        withTiming(-5, { duration: 50 }),
+        withTiming(5, { duration: 50 }),
+        withTiming(-5, { duration: 50 }),
+        withTiming(5, { duration: 50 }),
+        withTiming(0, { duration: 50 })
+      );
+    }
+  }, [isUrgent]);
 
+  const shakeStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: shakeOffset.value }]
+  }));
+  
   return (
-    <View style={styles.container}>
+    <Animated.View style={[styles.container, { backgroundColor: isEmergency ? Colors.error100 : (isUrgent ? Colors.warning100 : Colors.surfaceSecondary) }, shakeStyle]}>
       <StatusBar barStyle="dark-content" />
-      <LinearGradient colors={currentState.bg} style={StyleSheet.absoluteFill} />
 
-      {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top }]}>
-        <Pressable onPress={() => router.back()} style={styles.iconBtn}>
-          <Ionicons name="arrow-back" size={24} color={Colors.text} />
-        </Pressable>
-        <Text style={styles.headerTitle}>Live Queue</Text>
-        <Pressable style={styles.iconBtn}>
-          <Ionicons name="share-outline" size={24} color={Colors.text} />
-        </Pressable>
+      {/* Header Actions */}
+      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+        <AnimatedButton onPress={() => router.canGoBack() ? router.back() : router.replace('/')} style={styles.iconBtn}>
+          <Ionicons name="close" size={24} color={Colors.textPrimary} />
+        </AnimatedButton>
+        <AnimatedButton style={styles.iconBtn} onPress={handleCancel}>
+           <Ionicons name="trash-outline" size={20} color={Colors.textSecondary} />
+        </AnimatedButton>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
 
-        {/* Status Banner */}
-        <GlassView style={styles.statusBanner} intensity={60} gradientColors={['rgba(255,255,255,0.7)', 'rgba(255,255,255,0.4)']}>
-          <View style={[styles.statusIcon, { backgroundColor: currentState.accent }]}>
-            <Ionicons name={calculations.state === 'alert' ? "alert-outline" : "hourglass-outline"} size={24} color="#fff" />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.statusTitle, { color: currentState.text }]}>{msg.title}</Text>
-            <Text style={styles.statusSub}>{msg.sub}</Text>
-          </View>
-        </GlassView>
-
-        {/* Main Token Circle */}
-        <Animated.View style={[styles.tokenSection, cardPulseStyle]}>
-          <View style={[styles.pulseRing, { borderColor: currentState.accent }]} />
-          <View style={[styles.pulseRing, { borderColor: currentState.accent, opacity: 0.1, transform: [{ scale: 1.2 }] }]} />
-
-          <View style={styles.tokenCircle}>
-            <LinearGradient colors={['#fff', '#F1F5F9']} style={StyleSheet.absoluteFill} />
-            <Text style={styles.tokenLabel}>YOUR TOKEN</Text>
-            <Text style={[styles.tokenValue, { color: currentState.accent }]}>{activeBooking.tokenNumber}</Text>
-            <View style={[styles.servingBadge, { backgroundColor: currentState.accent }]}>
-              <Text style={styles.servingText}>Serving #{activeBooking.servingToken}</Text>
-            </View>
-          </View>
+        {/* 1. LIVE STATUS */}
+        <Animated.View entering={FadeInDown.duration(Motion.duration.reveal).delay(Motion.stagger)} style={styles.liveStatusContainer}>
+             <View style={[styles.liveBadge, { borderColor: isAlert ? Colors.error100 : Colors.success100 }]}>
+                  <Animated.View style={[styles.liveDot, { backgroundColor: isAlert ? Colors.error500 : Colors.success500 }, liveDotStyle]} />
+                  <Text style={[styles.liveText, { color: isAlert ? Colors.error500 : Colors.success500 }]}>Live Queue</Text>
+             </View>
+             <Animated.View 
+                key={activeBooking.servingToken} 
+                entering={FadeInDown.duration(Motion.duration.action).springify()}
+             >
+                <Text style={styles.servingText}>Serving #{activeBooking.servingToken}</Text>
+             </Animated.View>
+             <Text style={styles.updateText}>Updating in real time</Text>
         </Animated.View>
 
-        {/* Progress Bar */}
-        <View style={styles.progressSection}>
-          <View style={styles.progressRow}>
-            <Text style={styles.progressLabel}>Progress</Text>
-            <Text style={styles.progressVal}>{Math.round(calculations.progress * 100)}%</Text>
-          </View>
-          <View style={styles.track}>
-            <Animated.View style={[styles.bar, { backgroundColor: currentState.accent }, progressBarStyle]} />
-          </View>
-          <Text style={styles.aheadText}>
-            <Text style={{ fontFamily: 'Inter_700Bold' }}>{calculations.peopleBefore}</Text> people ahead of you
-          </Text>
-        </View>
+        {/* 2. YOUR POSITION */}
+        <Animated.View entering={FadeInDown.duration(Motion.duration.reveal).delay(Motion.stagger * 2)} style={styles.heroContainer}>
+             <Text style={styles.heroLabel}>{isEmergency ? "Priority Status" : "You are"}</Text>
+             <Text style={[styles.heroValue, isEmergency && { color: Colors.error500, fontSize: 60 }]}>
+                 {isEmergency ? "PRIORITY" : `#${activeBooking.tokenNumber}`}
+             </Text>
+             <View style={[styles.aheadBadge, isEmergency && { borderColor: Colors.error500 }]}>
+                 {isEmergency ? (
+                    <Text style={[styles.aheadText, { color: Colors.error500 }]}>Moved ahead in queue</Text>
+                 ) : (
+                    <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                        <CountUp value={calculations.peopleBefore} duration={500} style={styles.aheadText} />
+                        <Text style={styles.aheadText}> people ahead</Text>
+                    </View>
+                 )}
+             </View>
+        </Animated.View>
 
-        {/* Metrics */}
-        <GlassView style={styles.metricsGrid} intensity={40} border>
-          <View style={styles.metricItem}>
-            <Text style={styles.metricVal}>{Math.max(0, calculations.totalWait)}<Text style={styles.metricUnit}>m</Text></Text>
-            <Text style={styles.metricLabel}>Est. Wait</Text>
-          </View>
-          <View style={styles.metricDivider} />
-          <View style={styles.metricItem}>
-            <Text style={[styles.metricVal, { color: calculations.timeToLeave <= 0 ? Colors.danger : Colors.text }]}>
-              {calculations.timeToLeave <= 0 ? 'Now' : calculations.timeToLeave}<Text style={styles.metricUnit}>{calculations.timeToLeave <= 0 ? '' : 'm'}</Text>
-            </Text>
-            <Text style={styles.metricLabel}>Leave In</Text>
-          </View>
-          <View style={styles.metricDivider} />
-          <View style={styles.metricItem}>
-            <Text style={styles.metricVal}>{activeBooking.travelTime}<Text style={styles.metricUnit}>m</Text></Text>
-            <Text style={styles.metricLabel}>Travel</Text>
-          </View>
-        </GlassView>
+        {/* 5. QUEUE VISUALIZATION */}
+        <Animated.View entering={FadeInDown.duration(Motion.duration.reveal).delay(Motion.stagger * 3)}>
+             <QueueVisualization 
+                 total={activeBooking.tokenNumber} 
+                 current={activeBooking.servingToken} 
+                 yours={activeBooking.tokenNumber} 
+             />
+        </Animated.View>
 
-        {/* Clinic Info */}
-        <GlassView style={styles.clinicCard} intensity={50} border>
-          <View style={styles.clinicIcon}>
-            <Ionicons name="medical" size={24} color={Colors.primary} />
-          </View>
-          <View>
-            <Text style={styles.clinicName}>{activeBooking.clinicName}</Text>
-            <Text style={styles.doctorName}>{activeBooking.doctorName}</Text>
-          </View>
-        </GlassView>
+        {/* 3. TIME INTELLIGENCE */}
+        <Animated.View entering={FadeInDown.duration(Motion.duration.reveal).delay(Motion.stagger * 4)} style={styles.timeCard}>
+            <View style={styles.timeRow}>
+                <Ionicons name="time" size={20} color={Colors.textPrimary} />
+                <Text style={styles.timeEst}>Estimated wait: {Math.max(0, calculations.totalWait - 2)}–{Math.max(0, calculations.totalWait + 2)} mins</Text>
+            </View>
+            <View style={styles.accuracyRow}>
+                <Ionicons name="checkmark-circle" size={12} color={Colors.success500} />
+                <Text style={styles.accuracyText}>Accuracy: High (±2 mins)</Text>
+            </View>
+        </Animated.View>
 
-        {/* Actions */}
-        <View style={styles.actions}>
-          {!isOnMyWay ? (
-            <GradientButton
-              title="I'm on my way"
-              icon="navigate"
-              onPress={() => setIsOnMyWay(true)}
-              variant="primary"
-            />
-          ) : (
-            <GradientButton
-              title="On the way"
-              icon="checkmark-circle"
-              onPress={() => { }}
-              variant="secondary"
-              disabled
-            />
-          )}
+        {/* 4. ACTION CUE */}
+        <Animated.View entering={FadeInDown.duration(Motion.duration.reveal).delay(Motion.stagger * 5)}>
+            <View style={[styles.actionCueCard, { backgroundColor: isEmergency ? Colors.error500 : (isAlert ? Colors.warning500 : Colors.primary500) }]}>
+                {isEmergency || calculations.timeToLeave <= 0 ? (
+                    <>
+                       <Ionicons name="warning" size={24} color="#fff" />
+                       <View style={{flex: 1, marginLeft: 12}}>
+                           <Text style={styles.actionCueTitle}>{isEmergency ? "Proceed Immediately" : "Leave Now"}</Text>
+                           <Text style={styles.actionCueSub}>
+                               {isEmergency 
+                                  ? "The clinic is expecting you. Please head to the triage desk upon arrival."
+                                  : "Your buffer time has ended. Please proceed to the clinic immediately."}
+                           </Text>
+                       </View>
+                    </>
+                ) : (
+                    <>
+                       <Ionicons name="car-sport" size={24} color="#fff" />
+                       <View style={{flex: 1, marginLeft: 12, flexDirection: 'row', alignItems: 'center'}}>
+                           <Text style={styles.actionCueTitle}>Leave in </Text>
+                           <CountUp value={calculations.timeToLeave} duration={300} style={styles.actionCueTitle} />
+                           <Text style={styles.actionCueTitle}> mins</Text>
+                       </View>
+                    </>
+                )}
+            </View>
+        </Animated.View>
 
-          <View style={styles.secondaryActions}>
-            <GradientButton
-              title="Snooze"
-              icon="time-outline"
-              onPress={handleSnooze}
-              variant="outline"
-              style={{ flex: 1 }}
-            />
-            <GradientButton
-              title="Cancel"
-              icon="close-circle-outline"
-              onPress={handleCancel}
-              variant="danger" // Will map to a red gradient if I add it, or default
-              style={{ flex: 1 }}
-            />
-          </View>
-        </View>
+        {/* 6. REAL-TIME EVENTS */}
+        <Animated.View entering={FadeInDown.duration(400).delay(300)} style={styles.eventsCard}>
+             <Text style={styles.eventsTitle}>{isEmergency ? "Priority Status" : "Live Updates"}</Text>
+             <View style={styles.eventsList}>
+                 {isEmergency ? (
+                     <>
+                        <View style={styles.eventRow}>
+                            <View style={[styles.eventDot, {backgroundColor: Colors.success500}]} />
+                            <Text style={styles.eventText}>Clinic notified of your arrival</Text>
+                        </View>
+                        <View style={styles.eventRow}>
+                            <View style={[styles.eventDot, {backgroundColor: Colors.error500}]} />
+                            <Text style={styles.eventText}>Triage desk alerted</Text>
+                        </View>
+                     </>
+                 ) : (
+                     <>
+                        <View style={styles.eventRow}>
+                            <View style={[styles.eventDot, {backgroundColor: Colors.success500}]} />
+                            <Text style={styles.eventText}>Serving speed increased</Text>
+                        </View>
+                        <View style={styles.eventRow}>
+                            <View style={[styles.eventDot, {backgroundColor: Colors.primary500}]} />
+                            <Text style={styles.eventText}>+2 patients added behind you</Text>
+                        </View>
+                     </>
+                 )}
+                 {!isEmergency && calculations.peopleBefore > 4 && (
+                    <View style={styles.eventRow}>
+                        <View style={[styles.eventDot, {backgroundColor: Colors.warning500}]} />
+                        <Text style={styles.eventText}>⚠️ Minor delay detected (+2 mins)</Text>
+                    </View>
+                 )}
+             </View>
+        </Animated.View>
+
+        {/* 7. EMERGENCY ESCAPE */}
+        {!activeBooking.isEmergency && (
+             <Animated.View entering={FadeInDown.duration(400).delay(350)} style={{marginTop: 8}}>
+                 <Pressable style={styles.emergencyBtn}>
+                     <Ionicons name="medical" size={16} color={Colors.error500} />
+                     <Text style={styles.emergencyBtnText}>Need urgent care? Switch to Priority</Text>
+                 </Pressable>
+             </Animated.View>
+        )}
+
       </ScrollView>
-    </View>
+      </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background,
-    overflow: 'hidden',
-  },
-  centerContent: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontFamily: 'Inter_600SemiBold',
-    color: Colors.text,
-  },
-  iconBtn: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.5)',
-  },
-  scrollContent: {
-    paddingHorizontal: 24,
-    paddingTop: 20,
-    paddingBottom: 40,
-  },
-  statusBanner: {
+  container: { flex: 1, backgroundColor: Colors.surfaceSecondary },
+  header: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20, paddingBottom: 10 },
+  iconBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.surfaceSecondary, alignItems: 'center', justifyContent: 'center' },
+  scrollContent: { paddingHorizontal: 24, paddingBottom: 60 },
+
+  liveStatusContainer: { alignItems: 'center', marginBottom: 24 },
+  liveBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    borderRadius: 20,
-    gap: 16,
-    marginBottom: 32,
-  },
-  statusIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  statusTitle: {
-    fontSize: 16,
-    fontFamily: 'Inter_700Bold',
-    marginBottom: 2,
-  },
-  statusSub: {
-    fontSize: 13,
-    fontFamily: 'Inter_500Medium',
-    color: Colors.textSecondary,
-    lineHeight: 18,
-  },
-  tokenSection: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 40,
-    height: 250,
-  },
-  tokenCircle: {
-    width: 220,
-    height: 220,
-    borderRadius: 110,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...Colors.shadows.lg,
-    backgroundColor: '#fff',
-    zIndex: 10,
-  },
-  pulseRing: {
-    position: 'absolute',
-    width: 220,
-    height: 220,
-    borderRadius: 110,
-    borderWidth: 2,
-    opacity: 0.3,
-  },
-  tokenLabel: {
-    fontSize: 12,
-    fontFamily: 'Inter_600SemiBold',
-    color: Colors.textMuted,
-    marginBottom: 4,
-    letterSpacing: 2,
-    textTransform: 'uppercase',
-  },
-  tokenValue: {
-    fontSize: 64,
-    fontFamily: 'Inter_700Bold',
-    lineHeight: 70,
-  },
-  servingBadge: {
-    marginTop: 8,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
+    borderWidth: 1,
+    backgroundColor: Colors.surfacePrimary,
+    marginBottom: 12
   },
+  liveDot: { width: 8, height: 8, borderRadius: 4, marginRight: 6 },
+  liveText: { fontFamily: 'Inter_700Bold', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1 },
   servingText: {
-    color: '#fff',
-    fontSize: 12,
-    fontFamily: 'Inter_600SemiBold',
+    ...Typography.numbers,
+    fontSize: 24,
+    lineHeight: 30,
+    color: Colors.textPrimary,
+    marginBottom: 4
   },
-  progressSection: {
-    marginBottom: 24,
+  updateText: { fontFamily: 'Inter_500Medium', fontSize: 13, color: Colors.textTertiary },
+
+  heroContainer: { alignItems: 'center', marginBottom: 24 },
+  heroLabel: { fontFamily: 'Inter_600SemiBold', fontSize: 13, color: Colors.textSecondary, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 },
+  heroValue: {
+    ...Typography.numbers,
+    fontSize: 80,
+    lineHeight: 92,
+    color: Colors.textPrimary,
   },
-  progressRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  progressLabel: {
-    fontSize: 14,
-    fontFamily: 'Inter_500Medium',
-    color: Colors.textSecondary,
-  },
-  progressVal: {
-    fontSize: 14,
-    fontFamily: 'Inter_700Bold',
-    color: Colors.text,
-  },
-  track: {
-    height: 10,
-    backgroundColor: 'rgba(0,0,0,0.05)',
-    borderRadius: 5,
-    overflow: 'hidden',
-    marginBottom: 8,
-  },
-  bar: {
-    height: '100%',
-    borderRadius: 5,
-  },
-  aheadText: {
-    textAlign: 'center',
-    fontSize: 13,
-    color: Colors.textSecondary,
-    fontFamily: 'Inter_500Medium',
-  },
-  metricsGrid: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 20,
-    borderRadius: 20,
-    marginBottom: 20,
-  },
-  metricItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  metricVal: {
-    fontSize: 20,
-    fontFamily: 'Inter_700Bold',
-    color: Colors.text,
-    marginBottom: 2,
-  },
-  metricUnit: {
-    fontSize: 12,
-    fontFamily: 'Inter_500Medium',
-    color: Colors.textMuted,
-  },
-  metricLabel: {
-    fontSize: 12,
-    fontFamily: 'Inter_500Medium',
-    color: Colors.textMuted,
-    textTransform: 'uppercase',
-  },
-  metricDivider: {
-    width: 1,
-    height: 30,
-    backgroundColor: Colors.borderLight,
-  },
-  clinicCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: 20,
-    gap: 16,
-    marginBottom: 32,
-  },
-  clinicIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 16,
-    backgroundColor: Colors.primaryBg,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  clinicName: {
-    fontSize: 16,
-    fontFamily: 'Inter_600SemiBold',
-    color: Colors.text,
-  },
-  doctorName: {
-    fontSize: 14,
-    fontFamily: 'Inter_500Medium',
-    color: Colors.textSecondary,
-  },
-  actions: {
-    gap: 12,
-  },
-  secondaryActions: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  emptyState: {
-    alignItems: 'center',
-    gap: 12,
-  },
-  emptyTitle: {
-    fontSize: 20,
-    fontFamily: 'Inter_700Bold',
-    color: Colors.text,
-  },
-  emptySub: {
-    fontSize: 14,
-    fontFamily: 'Inter_500Medium',
-    color: Colors.textSecondary,
-    textAlign: 'center',
-    maxWidth: 250,
-  },
+  aheadBadge: { backgroundColor: Colors.surfacePrimary, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: Colors.borderLight, marginTop: 8 },
+  aheadText: { fontFamily: 'Inter_700Bold', fontSize: 14, color: Colors.textSecondary },
+
+  qVizContainer: { marginBottom: 32, alignItems: 'center' },
+  qVizRow: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 20 },
+  qDot: { width: 12, height: 12, borderRadius: 6 },
+  qDotServing: { backgroundColor: Colors.success500 },
+  qDotYou: { backgroundColor: Colors.primary500, width: 14, height: 14, borderRadius: 7, borderWidth: 2, borderColor: Colors.surfacePrimary },
+  qDotAhead: { backgroundColor: Colors.gray200 },
+  qVizLabels: { flexDirection: 'row', justifyContent: 'space-between', width: '60%', marginTop: 8 },
+  qVizLabel: { fontFamily: 'Inter_500Medium', fontSize: 12, color: Colors.textTertiary },
+
+  timeCard: { backgroundColor: Colors.surfacePrimary, borderRadius: 16, padding: 20, borderWidth: 1, borderColor: Colors.gray200, marginBottom: 16 },
+  timeRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 },
+  timeEst: { fontFamily: 'Inter_700Bold', fontSize: 18, color: Colors.textPrimary },
+  accuracyRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginLeft: 30 },
+  accuracyText: { fontFamily: 'Inter_500Medium', fontSize: 12, color: Colors.success500 },
+
+  actionCueCard: { flexDirection: 'row', alignItems: 'center', padding: 20, borderRadius: 20, marginBottom: 24, ...Colors.shadows.md },
+  actionCueTitle: { fontFamily: 'Inter_800ExtraBold', fontSize: 18, color: Colors.textOnColor, marginBottom: 4 },
+  actionCueSub: { fontFamily: 'Inter_500Medium', fontSize: 13, color: Colors.textOnColorSecondary, lineHeight: 18 },
+
+  eventsCard: { backgroundColor: Colors.surfacePrimary, padding: 20, borderRadius: 16, borderWidth: 1, borderColor: Colors.gray200, marginBottom: 24 },
+  eventsTitle: { fontFamily: 'Inter_700Bold', fontSize: 12, color: Colors.textTertiary, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 16 },
+  eventsList: { gap: 12 },
+  eventRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  eventDot: { width: 6, height: 6, borderRadius: 3 },
+  eventText: { fontFamily: 'Inter_500Medium', fontSize: 14, color: Colors.textPrimary },
+
+  emergencyBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: Colors.error100, paddingVertical: 16, borderRadius: 16, borderWidth: 1, borderColor: Colors.error500 },
+  emergencyBtnText: { fontFamily: 'Inter_700Bold', fontSize: 14, color: Colors.error500 },
 });
