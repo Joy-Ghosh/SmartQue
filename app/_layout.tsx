@@ -7,6 +7,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { queryClient } from '@/lib/query-client';
 import { QueueProvider } from '@/lib/queue-context';
+import { AuthProvider } from '@/lib/auth-context';
 import { useFonts, Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
 
 SplashScreen.preventAutoHideAsync();
@@ -19,6 +20,7 @@ function RootLayoutNav() {
       <Stack.Screen name="clinic/[id]" options={{ headerShown: false }} />
       <Stack.Screen name="active-token" options={{ headerShown: false }} />
       <Stack.Screen name="appointments" options={{ headerShown: false }} />
+      <Stack.Screen name="emergency" options={{ headerShown: false }} />
       <Stack.Screen name="payment-methods" options={{ headerShown: false, presentation: 'modal' }} />
     </Stack>
   );
@@ -56,9 +58,11 @@ export default function RootLayout() {
       <StatusBar style="dark" />
       <QueryClientProvider client={queryClient}>
         <GestureHandlerRootView style={{ flex: 1 }}>
-          <QueueProvider>
-            <RootLayoutNav />
-          </QueueProvider>
+          <AuthProvider>
+            <QueueProvider>
+              <RootLayoutNav />
+            </QueueProvider>
+          </AuthProvider>
         </GestureHandlerRootView>
       </QueryClientProvider>
     </ErrorBoundary>

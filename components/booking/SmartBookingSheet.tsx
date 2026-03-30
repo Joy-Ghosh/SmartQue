@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, View, Pressable, Platform, Modal, ScrollView } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { StyleSheet, Text, View, Pressable, Platform, Modal, ScrollView, TextInput } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
@@ -8,6 +8,7 @@ import { Typography } from '@/constants/styles';
 import { Motion } from '@/constants/motion';
 import { AnimatedButton } from '@/components/AnimatedButton';
 import { CountUp } from '@/components/CountUp';
+import { useAuth } from '@/lib/auth-context';
 import Animated, { FadeIn, FadeInDown, FadeInRight, FadeOutLeft, Layout } from 'react-native-reanimated';
 
 interface Patient {
@@ -20,7 +21,7 @@ interface TravelMode {
     id: 'car' | 'bike' | 'walk';
     icon: string;
     label: string;
-    eta: number; // in minutes
+    eta: number; 
 }
 
 interface SmartBookingSheetProps {
@@ -60,29 +61,6 @@ const EMERGENCY_SITUATIONS = [
     { id: 'other', label: 'Other', icon: 'medical' },
 ];
 
-function getLeaveTime(visitTimeStr: string, travelDeltMins: number) {
-    try {
-        let [time, modifier] = visitTimeStr.split(' ');
-        let [hours, mins] = time.split(':').map(Number);
-        if (modifier === 'PM' && hours !== 12) hours += 12;
-        if (modifier === 'AM' && hours === 12) hours = 0;
-        
-        let totalMins = hours * 60 + mins;
-        totalMins -= travelDeltMins;
-        
-        let outHours = Math.floor(totalMins / 60);
-        let outMins = totalMins % 60;
-        
-        let outModifier = outHours >= 12 ? 'PM' : 'AM';
-        outHours = outHours % 12;
-        if (outHours === 0) outHours = 12;
-        
-        return `${outHours}:${outMins.toString().padStart(2, '0')} ${outModifier}`;
-    } catch {
-        return '5:55 PM';
-    }
-}
-
 export default function SmartBookingSheet({
     isOpen,
     onClose,
@@ -92,17 +70,25 @@ export default function SmartBookingSheet({
     isEmergency = false,
     clinicName = 'City Dental Clinic',
 }: SmartBookingSheetProps) {
-    const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
+    const { isAuthenticated, login } = useAuth();
+    const [step, setStep] = useState<0 | 0.5 | 1 | 2 | 3 | 4>(1);
+    const [phoneNumber, setPhoneNumber] = useState('');
+    const [otp, setOtp] = useState(['', '', '', '']);
     const [selectedPatient, setSelectedPatient] = useState<Patient>(PATIENTS[0]);
     const [selectedSituation, setSelectedSituation] = useState(EMERGENCY_SITUATIONS[0]);
     const [selectedTravelMode, setSelectedTravelMode] = useState<TravelMode>(TRAVEL_MODES[0]);
     const [showPricing, setShowPricing] = useState(false);
+    const otpRefs = useRef<Array<TextInput | null>>([]);
+
+    useEffect(() => {
+        if (isOpen) {
+            setStep(isAuthenticated ? 1 : 0);
+        }
+    }, [isOpen, isAuthenticated]);
 
     // Mock Intelligence Data
     const queuePosition = 14;
     const estimatedVisit = '6:20 PM';
-    const leaveTime = getLeaveTime(estimatedVisit, selectedTravelMode.eta);
-
     const themeColor = isEmergency ? Colors.error500 : Colors.primary500;
 
     const handlePatientSelect = (patient: Patient) => {
@@ -118,12 +104,96 @@ export default function SmartBookingSheet({
     const handleConfirm = () => {
         if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         onConfirm({ patient: selectedPatient, travelMode: selectedTravelMode });
-        setTimeout(() => setStep(1), 500); // reset after transition
     };
 
     const handleClose = () => {
-        setStep(1);
         onClose();
+    };
+
+    const handleLogin = () => {
+        if (phoneNumber.length === 10) {
+            setStep(0.5); // OTP step
+        }
+    };
+
+    const handleOtpChange = (val: string, index: number) => {
+        const newOtp = [...otp];
+        newOtp[index] = val;
+        setOtp(newOtp);
+        if (val && index < 3) otpRefs.current[index + 1]?.focus();
+    };
+
+    const handleOtpVerify = async () => {
+        if (otp.join('').length === 4) {
+            await login(phoneNumber);
+            setStep(1);
+        }
+    };
+
+    const renderAuthSteps = () => {
+        if (step === 0) { // Mobile Number
+            return (
+                <Animated.View entering={FadeInDown} style={styles.stepContainer}>
+                    <Text style={styles.stepTitle}>Verify Identity</Text>
+                    <Text style={styles.stepSubtitle}>Enter your mobile number to reserve your spot in the queue.</Text>
+                    
+                    <View style={styles.inputContainer}>
+                        <View style={styles.prefixContainer}>
+                            <Text style={styles.prefixText}>🇮🇳 +91</Text>
+                        </View>
+                        <TextInput
+                            style={styles.mobileInput}
+                            placeholder="00000 00000"
+                            keyboardType="phone-pad"
+                            maxLength={10}
+                            value={phoneNumber}
+                            onChangeText={setPhoneNumber}
+                            autoFocus
+                        />
+                    </View>
+
+                    <GradientButton 
+                        title="Get OTP" 
+                        onPress={handleLogin} 
+                        disabled={phoneNumber.length !== 10}
+                        style={{ marginTop: 20 }}
+                    />
+                </Animated.View>
+            );
+        }
+
+        if (step === 0.5) { // OTP
+            return (
+                <Animated.View entering={FadeInRight} style={styles.stepContainer}>
+                    <Text style={styles.stepTitle}>Verify OTP</Text>
+                    <Text style={styles.stepSubtitle}>Sent to +91 {phoneNumber}</Text>
+                    
+                    <View style={styles.otpRow}>
+                        {otp.map((digit, i) => (
+                            <TextInput
+                                key={i}
+                                ref={el => { otpRefs.current[i] = el; }}
+                                style={[styles.otpInput, digit ? styles.otpInputFilled : null]}
+                                keyboardType="number-pad"
+                                maxLength={1}
+                                value={digit}
+                                onChangeText={v => handleOtpChange(v, i)}
+                            />
+                        ))}
+                    </View>
+
+                    <GradientButton 
+                        title="Verify & Continue" 
+                        onPress={handleOtpVerify} 
+                        disabled={otp.join('').length !== 4}
+                        style={{ marginTop: 20 }}
+                    />
+                    <Pressable onPress={() => setStep(0)} style={{ marginTop: 16, alignItems: 'center' }}>
+                        <Text style={{ color: Colors.primary500, fontFamily: 'Inter_600SemiBold' }}>Change Number</Text>
+                    </Pressable>
+                </Animated.View>
+            );
+        }
     };
 
     return (
@@ -134,8 +204,8 @@ export default function SmartBookingSheet({
                 <View style={styles.modalContent}>
                     <View style={styles.handleBar} />
 
-                    {/* Persistent Context Bar (Steps 2-4) */}
-                    {step > 1 && (
+                    {/* Persistent Context Bar (Booking Steps 1-4) */}
+                    {step >= 1 && (
                         <Animated.View 
                             entering={FadeInDown.duration(Motion.duration.action)} 
                             style={[styles.persistentBar, isEmergency && { backgroundColor: Colors.error500 }]}
@@ -153,252 +223,170 @@ export default function SmartBookingSheet({
 
                     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.contentContainer}>
                         
-                        <Animated.View key={step} entering={FadeInRight.duration(Motion.duration.action)} exiting={FadeOutLeft.duration(Motion.duration.action)}>
-                           <View style={styles.stepIndicatorRow}>
-                              <Text style={styles.stepIndicatorText}>Step {step} of 4</Text>
-                           </View>
-
-                        {/* Step 1: Context Entry */}
-                        {step === 1 && (
-                            <Animated.View entering={FadeInDown.duration(400)} style={styles.stepContainer}>
-                                <Text style={styles.stepTitle}>{isEmergency ? "Emergency Priority" : "Before you join..."}</Text>
-                                <Text style={styles.stepSubtitle}>{isEmergency ? "You will be moved ahead for immediate care" : "Here is what will happen"}</Text>
-
-                                <View style={styles.contextCard}>
-                                    <Text style={styles.contextLabel}>You are joining:</Text>
-                                    <View style={styles.contextHeaderRow}>
-                                        <Text style={styles.clinicTitle}>{clinicName}</Text>
-                                    </View>
-                                    
-                                    <View style={styles.statusPill}>
-                                        <Text style={styles.statusPillText}>🟡  Booking Open</Text>
-                                        <Text style={styles.statusPillSub}>Opens at 5:00 PM</Text>
-                                    </View>
-
-                                    <View style={styles.divider} />
-
-                                    <Text style={styles.contextLabel}>If you join now:</Text>
-                                    <View style={styles.predictionRow}>
-                                        <Text style={styles.predictionBigVal}>You will be <Text style={{fontFamily: 'Inter_800ExtraBold', color: themeColor}}>#{queuePosition}</Text></Text>
-                                    </View>
-                                    <View style={styles.predictionDetail}>
-                                        <Ionicons name="time" size={16} color={Colors.textSecondary} />
-                                        <Text style={styles.predictionDetailText}>Estimated visit: <Text style={{fontFamily: 'Inter_700Bold', color: Colors.text}}>{estimatedVisit}</Text></Text>
-                                    </View>
-                                    <View style={[styles.predictionDetail, {marginTop: 4}]}>
-                                        <Ionicons name="cash-outline" size={16} color={Colors.textSecondary} />
-                                        <Text style={styles.predictionDetailText}>Consultation: <Text style={{fontFamily: 'Inter_700Bold'}}>₹{consultationFee}</Text></Text>
-                                    </View>
+                        {step < 1 ? renderAuthSteps() : (
+                            <Animated.View key={step as any} entering={FadeInRight.duration(Motion.duration.action)} exiting={FadeOutLeft.duration(Motion.duration.action)}>
+                                <View style={styles.stepIndicatorRow}>
+                                    <Text style={styles.stepIndicatorText}>Step {step} of 4</Text>
                                 </View>
 
-                                <View style={styles.navRow}>
-                                    <GradientButton 
-                                        title={isEmergency ? "I Understand, Get Priority" : "I Understand, Continue"} 
-                                        onPress={() => setStep(2)} 
-                                        variant={isEmergency ? 'danger' : 'primary'} 
-                                        style={{ flex: 1 }} 
-                                    />
-                                </View>
-                            </Animated.View>
-                        )}
+                                {/* Step 1: Context Entry */}
+                                {step === 1 && (
+                                    <Animated.View entering={FadeInDown.duration(400)} style={styles.stepContainer}>
+                                        <Text style={styles.stepTitle}>{isEmergency ? "Emergency Priority" : "Before you join..."}</Text>
+                                        <Text style={styles.stepSubtitle}>{isEmergency ? "You will be moved ahead for immediate care" : "Here is what will happen"}</Text>
 
-                        {/* Step 2: Patient Info / Emergency Select */}
-                        {step === 2 && (
-                            <Animated.View entering={FadeInDown.duration(400)} style={styles.stepContainer}>
-                                <Text style={styles.stepSubtitle}>
-                                    {isEmergency ? "This helps the clinic prepare for your arrival." : `This will securely reserve position #${queuePosition}.`}
-                                </Text>
-
-                                <View style={styles.grid}>
-                                    {isEmergency ? (
-                                        EMERGENCY_SITUATIONS.map((s) => (
-                                            <AnimatedButton
-                                                key={s.id}
-                                                style={[
-                                                    styles.optionCard,
-                                                    selectedSituation.id === s.id && { borderColor: themeColor, backgroundColor: Colors.error100 }
-                                                ]}
-                                                onPress={() => setSelectedSituation(s)}
-                                                activeScale={0.96}
-                                            >
-                                                <Ionicons
-                                                    name={s.icon as any}
-                                                    size={24}
-                                                    color={selectedSituation.id === s.id ? themeColor : Colors.textSecondary}
-                                                />
-                                                <Text style={[styles.optionLabel, selectedSituation.id === s.id && { color: themeColor, fontFamily: 'Inter_700Bold' }]}>{s.label}</Text>
-                                            </AnimatedButton>
-                                        ))
-                                    ) : (
-                                        PATIENTS.map((p) => (
-                                            <AnimatedButton
-                                                key={p.id}
-                                                style={[
-                                                    styles.optionCard,
-                                                    selectedPatient.id === p.id && { borderColor: themeColor, backgroundColor: Colors.primary100 }
-                                                ]}
-                                                onPress={() => handlePatientSelect(p)}
-                                                activeScale={0.96}
-                                            >
-                                                <Ionicons
-                                                    name={p.id === 'me' ? 'person' : 'people'}
-                                                    size={24}
-                                                    color={selectedPatient.id === p.id ? themeColor : Colors.textSecondary}
-                                                />
-                                                <Text style={[styles.optionLabel, selectedPatient.id === p.id && { color: themeColor, fontFamily: 'Inter_700Bold' }]}>{p.name}</Text>
-                                            </AnimatedButton>
-                                        ))
-                                    )}
-                                </View>
-
-                                {isEmergency && (
-                                    <View style={styles.triageBox}>
-                                        <View style={styles.triageHeader}>
-                                            <Text style={styles.triageTitle}>Priority: High</Text>
-                                            <Ionicons name="shield-checkmark" size={16} color={Colors.success500} />
+                                        <View style={styles.contextCard}>
+                                            <Text style={styles.contextLabel}>You are joining:</Text>
+                                            <View style={styles.contextHeaderRow}>
+                                                <Text style={styles.clinicTitle}>{clinicName}</Text>
+                                            </View>
+                                            <View style={styles.statusPill}>
+                                                <Text style={styles.statusPillText}>🟡  Booking Open</Text>
+                                                <Text style={styles.statusPillSub}>Opens at 5:00 PM</Text>
+                                            </View>
+                                            <View style={styles.divider} />
+                                            <Text style={styles.contextLabel}>If you join now:</Text>
+                                            <View style={styles.predictionRow}>
+                                                <Text style={styles.predictionBigVal}>You will be <Text style={{fontFamily: 'Inter_800ExtraBold', color: themeColor}}>#{queuePosition}</Text></Text>
+                                            </View>
+                                            <View style={styles.predictionDetail}>
+                                                <Ionicons name="time" size={16} color={Colors.textSecondary} />
+                                                <Text style={styles.predictionDetailText}>Estimated visit: <Text style={{fontFamily: 'Inter_700Bold', color: Colors.text}}>6:20 PM</Text></Text>
+                                            </View>
                                         </View>
-                                        <Text style={styles.triageText}>You will be moved ahead in queue. Clinic will be notified immediately.</Text>
-                                    </View>
+
+                                        <View style={styles.navRow}>
+                                            <GradientButton 
+                                                title={isEmergency ? "I Understand, Get Priority" : "I Understand, Continue"} 
+                                                onPress={() => setStep(2)} 
+                                                variant={isEmergency ? 'danger' : 'primary'} 
+                                                style={{ flex: 1 }} 
+                                            />
+                                        </View>
+                                    </Animated.View>
                                 )}
 
-                                <View style={styles.navRow}>
-                                    <GradientButton title="Back" onPress={() => setStep(1)} variant="outline" style={{ flex: 0.4 }} />
-                                    <GradientButton title="Next" onPress={() => setStep(3)} variant={isEmergency ? 'danger' : 'primary'} style={{ flex: 1 }} />
-                                </View>
-                            </Animated.View>
-                        )}
-
-                        {/* Step 3: Transport */}
-                        {step === 3 && (
-                            <Animated.View entering={FadeInDown.duration(400)} style={styles.stepContainer}>
-                                <Text style={styles.stepTitle}>How will you travel?</Text>
-                                <Text style={styles.stepSubtitle}>We'll calculate the exact time you should leave.</Text>
-
-                                <View style={styles.grid}>
-                                    {TRAVEL_MODES.map((m) => (
-                                        <AnimatedButton
-                                            key={m.id}
-                                            style={[
-                                                styles.optionCard,
-                                                selectedTravelMode.id === m.id && { borderColor: themeColor, backgroundColor: isEmergency ? Colors.error100 : Colors.primary100 }
-                                            ]}
-                                            onPress={() => handleTravelModeSelect(m)}
-                                            activeScale={0.96}
-                                        >
-                                            <Ionicons
-                                                name={m.icon as any}
-                                                size={28}
-                                                color={selectedTravelMode.id === m.id ? themeColor : Colors.textSecondary}
-                                            />
-                                            <Text style={[styles.optionLabel, selectedTravelMode.id === m.id && { color: themeColor, fontFamily: 'Inter_700Bold' }]}>{m.label}</Text>
-                                            <Text style={styles.optionSub}>{m.eta} min</Text>
-                                        </AnimatedButton>
-                                    ))}
-                                </View>
-
-                                {/* Dynamic Result Box */}
-                                <Animated.View layout={Layout.springify()} style={[styles.dynamicResultBox, isEmergency && { backgroundColor: Colors.error100, borderColor: Colors.error500 }]}>
-                                    <View style={{flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4}}>
-                                        <Ionicons name={isEmergency ? "warning" : "information-circle"} size={16} color={isEmergency ? Colors.error500 : Colors.primary500} />
-                                        <Text style={styles.resultLabel}>{isEmergency ? "Proceed Directly" : "Based on this:"}</Text>
-                                    </View>
-                                    <View style={{alignItems: 'center'}}>
-                                         <Text style={styles.resultValue}>
-                                             {isEmergency 
-                                                ? "Clinic notified. Start journey now." 
-                                                : `You should leave at ${leaveTime}`}
-                                         </Text>
-                                         <View style={styles.valueFraming}>
-                                             <Text style={styles.valueFramingText}>₹{consultationFee} consultation • No waiting time</Text>
-                                         </View>
-                                    </View>
-                                </Animated.View>
-
-                                <View style={styles.navRow}>
-                                    <GradientButton title="Back" onPress={() => setStep(2)} variant="outline" style={{ flex: 0.4 }} />
-                                    <GradientButton title="Next" onPress={() => setStep(4)} variant={isEmergency ? 'danger' : 'primary'} style={{ flex: 1 }} />
-                                </View>
-                            </Animated.View>
-                        )}
-
-                        {/* Step 4: Confirm */}
-                        {step === 4 && (
-                            <Animated.View entering={FadeInDown.duration(400)} style={styles.stepContainer}>
-                                <Text style={styles.confirmationTitle}>Confirm Your Visit</Text>
-
-                                {/* 1. Unified Summary Card */}
-                                <View style={styles.unifiedSummaryCard}>
-                                    <View style={styles.summaryItem}>
-                                        <Text style={styles.summaryItemLabel}>Clinic</Text>
-                                        <Text style={styles.summaryItemVal}>{clinicName}</Text>
-                                    </View>
-                                    <View style={styles.summaryGrid}>
-                                        <View style={styles.summaryItem}>
-                                            <Text style={styles.summaryItemLabel}>Patient</Text>
-                                            <Text style={styles.summaryItemVal}>{selectedPatient.name}</Text>
-                                        </View>
-                                        <View style={styles.summaryItem}>
-                                            <Text style={styles.summaryItemLabel}>Transport</Text>
-                                            <Text style={styles.summaryItemVal}>{selectedTravelMode.label}</Text>
-                                        </View>
-                                    </View>
-                                </View>
-
-                                {/* 2. Decision Block (Visual Hero) */}
-                                <View style={styles.decisionBlock}>
-                                    <View style={styles.positionHero}>
-                                        <Text style={styles.heroPositionLabel}>Your Position</Text>
-                                        <Text style={[styles.heroPositionValue, isEmergency && { color: Colors.error500 }]}>
-                                            {isEmergency ? "PRIORITY" : `#${queuePosition}`}
+                                {/* Step 2: Patient Info */}
+                                {step === 2 && (
+                                    <Animated.View entering={FadeInDown.duration(400)} style={styles.stepContainer}>
+                                        <Text style={styles.stepSubtitle}>
+                                            {isEmergency ? "This helps the clinic prepare for your arrival." : `This will securely reserve position #${queuePosition}.`}
                                         </Text>
-                                    </View>
-                                    
-                                    <View style={styles.timePair}>
-                                        <View style={styles.timeItem}>
-                                            <Text style={styles.timeValue}>{isEmergency ? "EXPECTED" : estimatedVisit}</Text>
-                                            <Text style={styles.timeLabel}>Visit</Text>
-                                        </View>
-                                        <View style={styles.timeDivider} />
-                                        <View style={styles.timeItem}>
-                                            <Text style={[styles.timeValue, { color: themeColor }]}>{isEmergency ? "NOW" : leaveTime}</Text>
-                                            <Text style={[styles.timeLabel, { color: themeColor, fontFamily: 'Inter_700Bold' }]}>Leave</Text>
-                                        </View>
-                                    </View>
-                                </View>
 
-                                {/* 3. Price + Trust */}
-                                <View style={styles.pricingSectionCompact}>
-                                    <Pressable 
-                                        style={styles.pricingHeaderCompact}
-                                        onPress={() => setShowPricing(!showPricing)}
-                                    >
-                                        <Text style={styles.pricingTotalLabel}>Total: <Text style={styles.pricingTotalValue}>₹{isEmergency ? (pricing?.total || 0) + (pricing?.emergencyPremium || 0) : pricing?.total || consultationFee}</Text></Text>
-                                        <Ionicons name={showPricing ? "chevron-up" : "chevron-down"} size={16} color={Colors.textSecondary} />
-                                    </Pressable>
-
-                                    {showPricing && (
-                                        <Animated.View entering={FadeIn.duration(200)} style={styles.pricingBreakdownCompact}>
-                                            <View style={styles.pricingRow}>
-                                                <Text style={styles.pricingLabel}>Consultation</Text>
-                                                <Text style={styles.pricingValue}>₹{pricing?.consultation || consultationFee}</Text>
-                                            </View>
-                                            {isEmergency && (
-                                                <View style={styles.pricingRow}>
-                                                    <Text style={[styles.pricingLabel, {color: Colors.error500}]}>Emergency</Text>
-                                                    <Text style={[styles.pricingValue, {color: Colors.error500}]}>+₹{pricing?.emergencyPremium || 300}</Text>
-                                                </View>
+                                        <View style={styles.grid}>
+                                            {isEmergency ? (
+                                                EMERGENCY_SITUATIONS.map((s) => (
+                                                    <AnimatedButton
+                                                        key={s.id}
+                                                        style={[
+                                                            styles.optionCard,
+                                                            selectedSituation.id === s.id && { borderColor: themeColor, backgroundColor: Colors.error100 }
+                                                        ]}
+                                                        onPress={() => setSelectedSituation(s)}
+                                                        activeScale={0.96}
+                                                    >
+                                                        <Ionicons name={s.icon as any} size={24} color={selectedSituation.id === s.id ? themeColor : Colors.textSecondary} />
+                                                        <Text style={[styles.optionLabel, selectedSituation.id === s.id && { color: themeColor, fontFamily: 'Inter_700Bold' }]}>{s.label}</Text>
+                                                    </AnimatedButton>
+                                                ))
+                                            ) : (
+                                                PATIENTS.map((p) => (
+                                                    <AnimatedButton
+                                                        key={p.id}
+                                                        style={[
+                                                            styles.optionCard,
+                                                            selectedPatient.id === p.id && { borderColor: themeColor, backgroundColor: Colors.primary100 }
+                                                        ]}
+                                                        onPress={() => handlePatientSelect(p)}
+                                                        activeScale={0.96}
+                                                    >
+                                                        <Ionicons name={p.id === 'me' ? 'person' : 'people'} size={24} color={selectedPatient.id === p.id ? themeColor : Colors.textSecondary} />
+                                                        <Text style={[styles.optionLabel, selectedPatient.id === p.id && { color: themeColor, fontFamily: 'Inter_700Bold' }]}>{p.name}</Text>
+                                                    </AnimatedButton>
+                                                ))
                                             )}
-                                        </Animated.View>
-                                    )}
-                                    
-                                    <Text style={styles.trustLine}>Pay at clinic • No hidden charges</Text>
-                                </View>
+                                        </View>
 
-                                {/* Items moved below the fold / Extra space */}
-                                <View style={{height: 100}} />
+                                        <View style={styles.navRow}>
+                                            <GradientButton title="Back" onPress={() => setStep(1)} variant="outline" style={{ flex: 0.4 }} />
+                                            <GradientButton title="Next" onPress={() => setStep(3)} variant={isEmergency ? 'danger' : 'primary'} style={{ flex: 1 }} />
+                                        </View>
+                                    </Animated.View>
+                                )}
+
+                                {/* Step 3: Transport */}
+                                {step === 3 && (
+                                    <Animated.View entering={FadeInDown.duration(400)} style={styles.stepContainer}>
+                                        <Text style={styles.stepTitle}>How will you travel?</Text>
+                                        <View style={styles.grid}>
+                                            {TRAVEL_MODES.map((m) => (
+                                                <AnimatedButton
+                                                    key={m.id}
+                                                    style={[
+                                                        styles.optionCard,
+                                                        selectedTravelMode.id === m.id && { borderColor: themeColor, backgroundColor: isEmergency ? Colors.error100 : Colors.primary100 }
+                                                    ]}
+                                                    onPress={() => handleTravelModeSelect(m)}
+                                                    activeScale={0.96}
+                                                >
+                                                    <Ionicons name={m.icon as any} size={28} color={selectedTravelMode.id === m.id ? themeColor : Colors.textSecondary} />
+                                                    <Text style={[styles.optionLabel, selectedTravelMode.id === m.id && { color: themeColor, fontFamily: 'Inter_700Bold' }]}>{m.label}</Text>
+                                                    <Text style={styles.optionSub}>{m.eta} min</Text>
+                                                </AnimatedButton>
+                                            ))}
+                                        </View>
+                                        <View style={[styles.dynamicResultBox, isEmergency && { backgroundColor: Colors.error100, borderColor: Colors.error500 }]}>
+                                             <Text style={styles.resultValue}>
+                                                 {isEmergency ? "Clinic notified. Start journey now." : `Optimized queue path found.`}
+                                             </Text>
+                                        </View>
+                                        <View style={styles.navRow}>
+                                            <GradientButton title="Back" onPress={() => setStep(2)} variant="outline" style={{ flex: 0.4 }} />
+                                            <GradientButton title="Next" onPress={() => setStep(4)} variant={isEmergency ? 'danger' : 'primary'} style={{ flex: 1 }} />
+                                        </View>
+                                    </Animated.View>
+                                )}
+
+                                {/* Step 4: Confirm */}
+                                {step === 4 && (
+                                    <Animated.View entering={FadeInDown.duration(400)} style={styles.stepContainer}>
+                                        <Text style={styles.confirmationTitle}>Confirm Your Visit</Text>
+                                        <View style={styles.unifiedSummaryCard}>
+                                            <View style={styles.summaryItem}>
+                                                <Text style={styles.summaryItemLabel}>Clinic</Text>
+                                                <Text style={styles.summaryItemVal}>{clinicName}</Text>
+                                            </View>
+                                            <View style={styles.summaryGrid}>
+                                                <View style={styles.summaryItem}>
+                                                    <Text style={styles.summaryItemLabel}>Patient</Text>
+                                                    <Text style={styles.summaryItemVal}>{selectedPatient.name}</Text>
+                                                </View>
+                                                <View style={styles.summaryItem}>
+                                                    <Text style={styles.summaryItemLabel}>Transport</Text>
+                                                    <Text style={styles.summaryItemVal}>{selectedTravelMode.label}</Text>
+                                                </View>
+                                            </View>
+                                        </View>
+                                        <View style={styles.decisionBlock}>
+                                            <View style={styles.positionHero}>
+                                                <Text style={styles.heroPositionLabel}>Your Position</Text>
+                                                <Text style={[styles.heroPositionValue, isEmergency && { color: Colors.error500 }]}>
+                                                    {isEmergency ? "PRIORITY" : `#${queuePosition}`}
+                                                </Text>
+                                            </View>
+                                        </View>
+                                        <View style={styles.pricingSectionCompact}>
+                                            <Pressable style={styles.pricingHeaderCompact} onPress={() => setShowPricing(!showPricing)}>
+                                                <Text style={styles.pricingTotalLabel}>Total Estimate: <Text style={styles.pricingTotalValue}>₹{pricing?.total || consultationFee}</Text></Text>
+                                                <Ionicons name={showPricing ? "chevron-up" : "chevron-down"} size={16} color={Colors.textSecondary} />
+                                            </Pressable>
+                                            <Text style={styles.trustLine}>Pay at clinic • No booking fee</Text>
+                                        </View>
+                                        <View style={{height: 100}} />
+                                    </Animated.View>
+                                )}
                             </Animated.View>
                         )}
-                        </Animated.View>
                     </ScrollView>
 
                     {/* Sticky CTA Bar */}
@@ -510,5 +498,12 @@ const styles = StyleSheet.create({
     valueFramingText: { fontFamily: 'Inter_700Bold', fontSize: 11, color: Colors.success700, textTransform: 'uppercase' },
 
     navRow: { flexDirection: 'row', gap: 12, marginTop: 20 },
-});
 
+    inputContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.gray50, borderRadius: 16, borderWidth: 1, borderColor: Colors.borderLight, height: 64, marginTop: 24 },
+    prefixContainer: { paddingHorizontal: 16, borderRightWidth: 1, borderRightColor: Colors.borderLight, justifyContent: 'center' },
+    prefixText: { fontFamily: 'Inter_600SemiBold', fontSize: 16, color: Colors.textPrimary },
+    mobileInput: { flex: 1, paddingHorizontal: 16, fontFamily: 'Inter_700Bold', fontSize: 20, color: Colors.textPrimary, letterSpacing: 1 },
+    otpRow: { flexDirection: 'row', justifyContent: 'center', gap: 12, marginTop: 32 },
+    otpInput: { width: 64, height: 72, backgroundColor: Colors.gray50, borderRadius: 16, borderWidth: 1, borderColor: Colors.borderLight, textAlign: 'center', fontFamily: 'Inter_700Bold', fontSize: 24, color: Colors.textPrimary },
+    otpInputFilled: { borderColor: Colors.primary500, backgroundColor: Colors.surfacePrimary, ...Colors.shadows.sm },
+});

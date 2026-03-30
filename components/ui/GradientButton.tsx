@@ -41,7 +41,7 @@ export function GradientButton({
         if (disabled) return ['#C4C9E0', '#C4C9E0'];
         switch (variant) {
             case 'secondary': return ['#FFFFFF', '#F7F5F2'];
-            case 'danger': return Colors.gradients.red;
+            case 'danger': return Colors.gradients.danger;
             case 'outline': return ['transparent', 'transparent'];
             case 'primary':
             default: return Colors.gradients.primary;
@@ -50,8 +50,8 @@ export function GradientButton({
 
     const getTextColor = () => {
         if (disabled) return '#8A8FA8';
-        if (variant === 'secondary') return Colors.primary;
-        if (variant === 'outline') return Colors.primary;
+        if (variant === 'secondary') return Colors.primary500;
+        if (variant === 'outline') return Colors.primary500;
         return '#FFFFFF';
     };
 

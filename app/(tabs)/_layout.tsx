@@ -1,288 +1,216 @@
-/**
- * SmartQ — Bottom Navigation System v2
- *
- * Design Philosophy: "Navigation as Live Context"
- * — Not a passive menu. An active system that shows queue state.
- * — "Now" tab is special: shows live position when in queue.
- * — Pill highlight for active state with smooth press feedback.
- * — Adaptive labels only when active (icon-only when passive).
- */
-import { Tabs, usePathname } from 'expo-router';
-import {
-  Platform,
-  StyleSheet,
-  View,
-  Text,
-  Pressable,
-  Animated,
-} from 'react-native';
+import React, { useEffect } from 'react';
+import { Tabs } from 'expo-router';
+import { Platform, StyleSheet, View, Text, Pressable, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import React, { useRef, useEffect, useCallback } from 'react';
-import Colors from '@/constants/colors';
 import * as Haptics from 'expo-haptics';
-import { useQueue } from '@/lib/queue-context';
+import Animated, {
+    useAnimatedStyle,
+    useSharedValue,
+    withSpring,
+    interpolateColor,
+    interpolate,
+    Extrapolate
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Colors from '@/constants/colors';
+import { Typography } from '@/constants/styles';
+import { QueueProvider, useQueue } from '@/lib/queue-context';
+import { ScrollProvider } from '@/lib/scroll-context';
 
-// ─── Live Position Dot ──────────────────────────────────────────────────────
-function LiveDot() {
-  const opacity = useRef(new Animated.Value(1)).current;
+const { width: WINDOW_WIDTH } = Dimensions.get('window');
 
-  useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(opacity, { toValue: 0.2, duration: 700, useNativeDriver: true }),
-        Animated.timing(opacity, { toValue: 1, duration: 700, useNativeDriver: true }),
-      ])
-    ).start();
-  }, []);
+// ── Tactile Pressable Component ──────────────────────────────────────────────
+function AnimatedPressable({ onPress, children, style, disabled = false }: any) {
+    const scale = useSharedValue(1);
+    
+    const scaleStyle = useAnimatedStyle(() => ({
+        transform: [{ scale: scale.value }]
+    }));
 
-  return <Animated.View style={[styles.liveDot, { opacity }]} />;
+    return (
+        <Pressable
+            disabled={disabled}
+            onPressIn={() => { scale.value = withSpring(0.92, { damping: 12, stiffness: 200 }); }}
+            onPressOut={() => { scale.value = withSpring(1, { damping: 12, stiffness: 200 }); }}
+            onPress={onPress}
+            style={style}
+        >
+            <Animated.View style={scaleStyle}>
+                {children}
+            </Animated.View>
+        </Pressable>
+    );
 }
 
-// ─── Individual Tab Icon ─────────────────────────────────────────────────────
-type TabIconProps = {
-  focused: boolean;
-  icon: string;
-  iconActive: string;
-  label: string;
-  badge?: string | null;
-  isLive?: boolean;
-  liveLabel?: string | null;
-};
+const TABS = [
+    { name: 'index', label: 'Home', icon: 'home' },
+    { name: 'search', label: 'Explore', icon: 'compass' },
+    { name: 'token', label: 'Emergency', activeLabel: 'Ticket', icon: 'medkit', activeIcon: 'ticket' },
+    { name: 'profile', label: 'Profile', icon: 'person' },
+];
 
-function TabIcon({ focused, icon, iconActive, label, badge, isLive, liveLabel }: TabIconProps) {
-  const scale = useRef(new Animated.Value(1)).current;
+function TabItem({ isSelected, onPress, tab, hasActiveToken }: { isSelected: boolean, onPress: () => void, tab: typeof TABS[0], hasActiveToken: boolean }) {
+    const progress = useSharedValue(isSelected ? 1 : 0);
 
-  const handlePress = useCallback(() => {
-    Animated.sequence([
-      Animated.timing(scale, { toValue: 0.88, duration: 80, useNativeDriver: true }),
-      Animated.spring(scale, { toValue: 1, friction: 4, tension: 200, useNativeDriver: true }),
-    ]).start();
-  }, [scale]);
+    useEffect(() => {
+        progress.value = withSpring(isSelected ? 1 : 0, { damping: 14, stiffness: 150 });
+    }, [isSelected]);
 
-  // Trigger press anim each time focused changes
-  useEffect(() => {
-    if (focused) handlePress();
-  }, [focused]);
+    const isDynamicTab = tab.name === 'token';
+    const currentLabel = (isDynamicTab && hasActiveToken) ? tab.activeLabel : tab.label;
+    const currentIcon = (isDynamicTab && hasActiveToken) ? tab.activeIcon : tab.icon;
+    
+    // Use design system colors
+    const activeColor = isDynamicTab && !hasActiveToken ? Colors.error500 : Colors.primary500;
+    const inactiveColor = Colors.gray400;
 
-  const displayLabel = focused && isLive && liveLabel ? liveLabel : label;
+    const animatedContainerStyle = useAnimatedStyle(() => {
+        return {
+            backgroundColor: interpolateColor(
+                progress.value,
+                [0, 1],
+                ['transparent', isDynamicTab && !hasActiveToken ? 'rgba(220, 38, 38, 0.08)' : 'rgba(38, 101, 140, 0.12)']
+            ),
+        };
+    });
 
-  return (
-    <Animated.View style={[styles.tabItem, focused && styles.tabItemActive, { transform: [{ scale }] }]}>
-      {/* Live indicator dot when active + in queue */}
-      {isLive && <LiveDot />}
+    const animatedTextStyle = useAnimatedStyle(() => {
+        return {
+            opacity: progress.value,
+            width: interpolate(progress.value, [0, 1], [0, 80], Extrapolate.CLAMP),
+            transform: [{ scale: interpolate(progress.value, [0, 1], [0.8, 1]) }]
+        };
+    });
 
-      <Ionicons
-        name={(focused ? iconActive : icon) as any}
-        size={22}
-        color={focused ? Colors.primary500 : Colors.gray400}
-      />
+    return (
+        <AnimatedPressable onPress={onPress} style={styles.tabPressable}>
+            <Animated.View style={[styles.tabContainer, animatedContainerStyle]}>
+                <Ionicons 
+                    name={isSelected ? currentIcon as any : `${currentIcon}-outline` as any} 
+                    size={22} 
+                    color={isSelected ? activeColor : inactiveColor} 
+                />
+                <Animated.View style={[styles.labelContainer, animatedTextStyle]}>
+                    <Text style={[styles.tabLabel, { color: activeColor }]} numberOfLines={1}>
+                        {currentLabel}
+                    </Text>
+                </Animated.View>
+            </Animated.View>
+        </AnimatedPressable>
+    );
+}
 
-      {focused && (
-        <Text style={styles.tabLabel}>{displayLabel}</Text>
-      )}
+function CustomTabBar({ state, descriptors, navigation }: any) {
+    const insets = useSafeAreaInsets();
+    const { activeBooking } = useQueue();
+    const hasActiveToken = !!activeBooking;
 
-      {/* Activity badge */}
-      {!focused && badge != null && (
-        <View style={styles.badge}>
-          <Text style={styles.badgeText}>{badge}</Text>
+    return (
+        <View style={styles.dockContainer} pointerEvents="box-none">
+            <View style={styles.dockAnimatedWrapper}>
+                <View style={[styles.glassDock, { paddingBottom: Math.max(insets.bottom, 12), height: 75 + (insets.bottom > 0 ? insets.bottom * 0.4 : 0) }]}>
+                    {state.routes.map((route: any, index: number) => {
+                        const tabDefinition = TABS.find(t => t.name === route.name);
+                        if (!tabDefinition) return null;
+
+                        const isSelected = state.index === index;
+
+                        const onPress = () => {
+                            const event = navigation.emit({
+                                type: 'tabPress',
+                                target: route.key,
+                                canPreventDefault: true,
+                            });
+
+                            if (!isSelected && !event.defaultPrevented) {
+                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                navigation.navigate(route.name);
+                            }
+                        };
+
+                        return (
+                            <TabItem 
+                                key={route.key} 
+                                isSelected={isSelected} 
+                                onPress={onPress} 
+                                tab={tabDefinition} 
+                                hasActiveToken={hasActiveToken}
+                            />
+                        );
+                    })}
+                </View>
+            </View>
         </View>
-      )}
-    </Animated.View>
-  );
+    );
 }
-
-// ─── Custom Tab Bar ──────────────────────────────────────────────────────────
-// We use the default Tabs TabBar but customize each icon slot.
-// The bottom safe area is handled per-platform.
 
 export default function TabLayout() {
-  const insets = useSafeAreaInsets();
-  const { activeBooking } = useQueue();
-
-  const hasActiveBooking = !!activeBooking;
-  const livePosition = activeBooking?.tokenNumber;
-  const tabBarHeight = 64 + (insets.bottom > 0 ? insets.bottom : 12);
-
-  return (
-    <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarShowLabel: false,
-        tabBarStyle: {
-          position: 'absolute',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          height: tabBarHeight,
-          backgroundColor: Colors.surfacePrimary,
-          borderTopWidth: 1,
-          borderTopColor: Colors.gray200,
-          // Soft top shadow only
-          elevation: 8,
-          shadowColor: Colors.gray900,
-          shadowOffset: { width: 0, height: -2 },
-          shadowOpacity: 0.06,
-          shadowRadius: 16,
-          paddingBottom: insets.bottom > 0 ? insets.bottom : 12,
-          paddingTop: 10,
-          paddingHorizontal: 8,
-        },
-      }}
-    >
-      {/* ── NOW (Home / Command Center) ── */}
-      <Tabs.Screen
-        name="index"
-        options={{
-          tabBarIcon: ({ focused }) => (
-            <TabIcon
-              focused={focused}
-              icon="time-outline"
-              iconActive="time"
-              label="Now"
-              isLive={hasActiveBooking}
-              liveLabel={livePosition ? `#${livePosition}` : 'Now'}
-            />
-          ),
-        }}
-        listeners={{
-          tabPress: () => {
-            if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-          },
-        }}
-      />
-
-      {/* ── EXPLORE (Clinic Search) ── */}
-      <Tabs.Screen
-        name="search"
-        options={{
-          tabBarIcon: ({ focused }) => (
-            <TabIcon
-              focused={focused}
-              icon="compass-outline"
-              iconActive="compass"
-              label="Explore"
-            />
-          ),
-        }}
-        listeners={{
-          tabPress: () => {
-            if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-          },
-        }}
-      />
-
-      {/* ── ACTIVITY (Bookings + History) ── */}
-      <Tabs.Screen
-        name="token"
-        options={{
-          tabBarIcon: ({ focused }) => (
-            <TabIcon
-              focused={focused}
-              icon="receipt-outline"
-              iconActive="receipt"
-              label="Activity"
-              badge={hasActiveBooking ? '1' : null}
-              isLive={hasActiveBooking && !focused}
-            />
-          ),
-        }}
-        listeners={{
-          tabPress: () => {
-            if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-          },
-        }}
-      />
-
-      {/* Hidden from nav */}
-      <Tabs.Screen
-        name="appointments"
-        options={{ href: null as any }}
-      />
-
-      {/* ── PROFILE ── */}
-      <Tabs.Screen
-        name="profile"
-        options={{
-          tabBarIcon: ({ focused }) => (
-            <TabIcon
-              focused={focused}
-              icon="person-outline"
-              iconActive="person"
-              label="Profile"
-            />
-          ),
-        }}
-        listeners={{
-          tabPress: () => {
-            if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-          },
-        }}
-      />
-    </Tabs>
-  );
+    return (
+        <ScrollProvider>
+            <Tabs
+                tabBar={(props) => <CustomTabBar {...props} />}
+                screenOptions={{ headerShown: false }}
+            >
+                <Tabs.Screen name="index" />
+                <Tabs.Screen name="search" />
+                <Tabs.Screen name="token" />
+                <Tabs.Screen name="profile" />
+            </Tabs>
+        </ScrollProvider>
+    );
 }
 
 const styles = StyleSheet.create({
-  // ── Tab item base (inactive) ─────────────────────────────────
-  tabItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: 44,
-    minWidth: 44,
-    borderRadius: 22,
-    gap: 5,
-    paddingHorizontal: 8,
-    position: 'relative',
-  },
-
-  // ── Active pill ──────────────────────────────────────────────
-  tabItemActive: {
-    backgroundColor: Colors.primary100,
-    paddingHorizontal: 14,
-  },
-
-  // ── Active label ─────────────────────────────────────────────
-  tabLabel: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 13,
-    color: Colors.primary500,
-    letterSpacing: -0.2,
-  },
-
-  // ── Live pulsing dot ─────────────────────────────────────────
-  liveDot: {
-    position: 'absolute',
-    top: 6,
-    right: 6,
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
-    backgroundColor: Colors.success500,
-    borderWidth: 1.5,
-    borderColor: Colors.surfacePrimary,
-  },
-
-  // ── Activity badge ────────────────────────────────────────────
-  badge: {
-    position: 'absolute',
-    top: 4,
-    right: 2,
-    backgroundColor: Colors.primary500,
-    borderRadius: 8,
-    minWidth: 16,
-    height: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 3,
-    borderWidth: 1.5,
-    borderColor: Colors.surfacePrimary,
-  },
-  badgeText: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 9,
-    color: Colors.textOnColor,
-    lineHeight: 12,
-  },
+    dockContainer: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        zIndex: 100,
+        overflow: 'visible', // Ensure shadow is not clipped
+    },
+    dockAnimatedWrapper: {
+        width: WINDOW_WIDTH,
+        backgroundColor: 'transparent',
+        ...Colors.shadows.sticky, // Use design system sticky shadow (upward)
+    },
+    glassDock: {
+        width: '100%',
+        borderTopLeftRadius: 32,
+        borderTopRightRadius: 32,
+        paddingHorizontal: 20, // Finalized 20px padding as requested
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between', // Changed to between to respect the side padding
+        backgroundColor: Colors.bgCard,
+        borderTopWidth: 1,
+        borderLeftWidth: 0, // Remove side borders for clean blending
+        borderRightWidth: 0,
+        borderColor: Colors.borderLight,
+    },
+    tabPressable: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    tabContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        borderRadius: 24,
+        minWidth: 44,
+        height: 48,
+    },
+    labelContainer: {
+        overflow: 'hidden',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    tabLabel: {
+        fontFamily: Typography.fontFamily.bold,
+        fontSize: 13,
+        marginLeft: 8,
+    }
 });

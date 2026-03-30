@@ -22,22 +22,21 @@ export const Typography = {
   },
   // Named scale matching the design system specification
   size: {
-    overline: 11,   // Uppercase status labels — "LIVE"
+    overline: 11,   // Uppercase status labels
     caption:  12,   // Labels, timestamps
     sm:       12,   // alias
-    small:    14,   // Secondary info
+    small:    12,   // alias
+    body:     14,   // General body text
     base:     14,   // alias
-    body:     16,   // General body text
+    H3:       16,   // Card titles, important data
     md:       16,   // alias
-    H3:       18,   // Card titles, important data
-    lg:       18,   // alias
-    H2:       22,   // Section titles, key values
-    xl:       20,
-    xxl:      24,
+    H2:       20,   // Section titles, key values
+    lg:       20,   // alias
     H1:       28,   // Doctor name, screen titles
+    xl:       24,   // H1 alt
+    xxl:      28,   // alias
     xxxl:     32,
-    // Number dominance scale — used for queue positions, times
-    display:  48,
+    display:  48,   // Queue positions, times
     huge:     64,
     massive:  80,
   },
@@ -127,7 +126,7 @@ export const ComponentStyles = {
     padding:          Spacing.md,
     borderWidth:      1,
     borderColor:      Colors.border,
-    ...Colors.shadows.sm,
+    // explicitly shadow-less per design rules
   },
   // GLASS LAYER — for overlays on images
   glassLayer: {

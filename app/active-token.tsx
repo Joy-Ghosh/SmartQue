@@ -6,7 +6,7 @@ import {
   ScrollView,
   Pressable,
   Platform,
-  Alert,
+  Modal,
   Dimensions,
   StatusBar,
 } from 'react-native';
@@ -15,13 +15,13 @@ import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
   FadeInDown,
+  FadeIn,
+  FadeOut,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
-  withSpring,
   withRepeat,
   withSequence,
-  Easing,
   ZoomIn,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
@@ -34,7 +34,7 @@ import { AnimatedButton } from '@/components/AnimatedButton';
 import { CountUp } from '@/components/CountUp';
 
 type QueueState = 'relax' | 'alert' | 'arrived' | 'emergency';
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
 
 // Queue bubble visualization
 function QueueVisualization({ total, current, yours }: { total: number; current: number; yours: number }) {
@@ -42,13 +42,10 @@ function QueueVisualization({ total, current, yours }: { total: number; current:
   const maxDots = Math.min(10, yours - current + 2);
   for (let i = 0; i < maxDots; i++) {
      if (i === 0) {
-       // serving
        dots.push(<View key={i} style={[styles.qDot, styles.qDotServing]} />);
      } else if (i === maxDots - 1) {
-       // you
        dots.push(<View key={i} style={[styles.qDot, styles.qDotYou]} />);
      } else {
-       // ahead
        dots.push(<View key={i} style={[styles.qDot, styles.qDotAhead]} />);
      }
   }
@@ -69,8 +66,8 @@ function QueueVisualization({ total, current, yours }: { total: number; current:
 export default function ActiveTokenScreen() {
   const insets = useSafeAreaInsets();
   const { activeBooking, updateServingToken, cancelBooking } = useQueue();
+  const [showCancelModal, setShowCancelModal] = useState(false);
 
-  const pulseScale = useSharedValue(1);
   const dotOpacity = useSharedValue(1);
 
   const calculations = useMemo(() => {
@@ -96,56 +93,35 @@ export default function ActiveTokenScreen() {
   }, []);
 
   useEffect(() => {
-    if (calculations?.state === 'alert' || calculations?.state === 'emergency') {
-         if (Platform.OS !== 'web' && calculations?.state === 'alert') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-    }
-  }, [calculations?.state]);
-
-  // Simulate Queue Movement
-  useEffect(() => {
     if (!activeBooking) return;
     const interval = setInterval(() => {
       updateServingToken(activeBooking.servingToken + 1);
-      if (Platform.OS !== 'web') {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      }
-    }, 15000); // 15 seconds skip for testing
+    }, 15000); 
     return () => clearInterval(interval);
   }, [activeBooking?.servingToken, updateServingToken]);
 
   const liveDotStyle = useAnimatedStyle(() => ({ opacity: dotOpacity.value }));
 
   const handleCancel = useCallback(() => {
-    Alert.alert('Cancel Position', 'Are you sure you want to leave the queue?', [
-      { text: 'Stay', style: 'cancel' },
-      { text: 'Leave Queue', style: 'destructive', onPress: () => { 
-          cancelBooking(); 
-          if (router.canGoBack()) router.back();
-          else router.replace('/');
-      } },
-    ]);
-  }, [cancelBooking]);
+    setShowCancelModal(true);
+    if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  }, []);
 
-  if (!activeBooking || !calculations) {
-    return (
-      <View style={[styles.container, {justifyContent:'center', alignItems: 'center'}]}>
-          <Text style={{fontFamily: 'Inter_700Bold'}}>No Active Queue</Text>
-          <GradientButton title="Go Back" onPress={() => router.canGoBack() ? router.back() : router.replace('/')} style={{marginTop: 20}}/>
-      </View>
-    );
-  }
+  const confirmCancel = () => {
+    cancelBooking();
+    setShowCancelModal(false);
+    if (router.canGoBack()) router.back();
+    else router.replace('/');
+  };
 
-  const isEmergency = activeBooking.isEmergency;
-  const isAlert = calculations.state === 'alert' || calculations.state === 'arrived' || isEmergency;
-  const isUrgent = calculations.peopleBefore < 2;
+  const isEmergency = activeBooking?.isEmergency ?? false;
+  const isAlert = (calculations?.state === 'alert' || calculations?.state === 'arrived' || isEmergency) ?? false;
+  const isUrgent = (calculations?.peopleBefore !== undefined && calculations.peopleBefore < 2) ?? false;
 
-  // Urgent Motion
   const shakeOffset = useSharedValue(0);
   useEffect(() => {
     if (isUrgent) {
       shakeOffset.value = withSequence(
-        withTiming(-5, { duration: 50 }),
-        withTiming(5, { duration: 50 }),
         withTiming(-5, { duration: 50 }),
         withTiming(5, { duration: 50 }),
         withTiming(0, { duration: 50 })
@@ -156,6 +132,15 @@ export default function ActiveTokenScreen() {
   const shakeStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: shakeOffset.value }]
   }));
+
+  if (!activeBooking || !calculations) {
+    return (
+      <View style={[styles.container, {justifyContent:'center', alignItems: 'center'}]}>
+          <Text style={{fontFamily: 'Inter_700Bold'}}>No Active Queue</Text>
+          <GradientButton title="Go Back" onPress={() => router.replace('/')} style={{marginTop: 20}}/>
+      </View>
+    );
+  }
   
   return (
     <Animated.View style={[styles.container, { backgroundColor: isEmergency ? Colors.error100 : (isUrgent ? Colors.warning100 : Colors.surfaceSecondary) }, shakeStyle]}>
@@ -167,30 +152,26 @@ export default function ActiveTokenScreen() {
           <Ionicons name="close" size={24} color={Colors.textPrimary} />
         </AnimatedButton>
         <AnimatedButton style={styles.iconBtn} onPress={handleCancel}>
-           <Ionicons name="trash-outline" size={20} color={Colors.textSecondary} />
+           <Ionicons name="trash-outline" size={20} color={isEmergency ? Colors.error500 : Colors.textSecondary} />
         </AnimatedButton>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-
-        {/* 1. LIVE STATUS */}
+        {/* LIVE STATUS */}
         <Animated.View entering={FadeInDown.duration(Motion.duration.reveal).delay(Motion.stagger)} style={styles.liveStatusContainer}>
              <View style={[styles.liveBadge, { borderColor: isAlert ? Colors.error100 : Colors.success100 }]}>
                   <Animated.View style={[styles.liveDot, { backgroundColor: isAlert ? Colors.error500 : Colors.success500 }, liveDotStyle]} />
                   <Text style={[styles.liveText, { color: isAlert ? Colors.error500 : Colors.success500 }]}>Live Queue</Text>
              </View>
-             <Animated.View 
-                key={activeBooking.servingToken} 
-                entering={FadeInDown.duration(Motion.duration.action).springify()}
-             >
+             <Animated.View key={activeBooking.servingToken} entering={FadeInDown.duration(400)}>
                 <Text style={styles.servingText}>Serving #{activeBooking.servingToken}</Text>
              </Animated.View>
              <Text style={styles.updateText}>Updating in real time</Text>
         </Animated.View>
 
-        {/* 2. YOUR POSITION */}
+        {/* YOUR POSITION */}
         <Animated.View entering={FadeInDown.duration(Motion.duration.reveal).delay(Motion.stagger * 2)} style={styles.heroContainer}>
-             <Text style={styles.heroLabel}>{isEmergency ? "Priority Status" : "You are"}</Text>
+             <Text style={styles.heroLabel}>{isEmergency ? "Priority Status" : "Your position"}</Text>
              <Text style={[styles.heroValue, isEmergency && { color: Colors.error500, fontSize: 60 }]}>
                  {isEmergency ? "PRIORITY" : `#${activeBooking.tokenNumber}`}
              </Text>
@@ -206,7 +187,7 @@ export default function ActiveTokenScreen() {
              </View>
         </Animated.View>
 
-        {/* 5. QUEUE VISUALIZATION */}
+        {/* QUEUE VISUALIZATION */}
         <Animated.View entering={FadeInDown.duration(Motion.duration.reveal).delay(Motion.stagger * 3)}>
              <QueueVisualization 
                  total={activeBooking.tokenNumber} 
@@ -215,7 +196,7 @@ export default function ActiveTokenScreen() {
              />
         </Animated.View>
 
-        {/* 3. TIME INTELLIGENCE */}
+        {/* TIME INTELLIGENCE */}
         <Animated.View entering={FadeInDown.duration(Motion.duration.reveal).delay(Motion.stagger * 4)} style={styles.timeCard}>
             <View style={styles.timeRow}>
                 <Ionicons name="time" size={20} color={Colors.textPrimary} />
@@ -223,22 +204,20 @@ export default function ActiveTokenScreen() {
             </View>
             <View style={styles.accuracyRow}>
                 <Ionicons name="checkmark-circle" size={12} color={Colors.success500} />
-                <Text style={styles.accuracyText}>Accuracy: High (±2 mins)</Text>
+                <Text style={styles.accuracyText}>Accuracy: High (±1 mins)</Text>
             </View>
         </Animated.View>
 
-        {/* 4. ACTION CUE */}
+        {/* ACTION CUE */}
         <Animated.View entering={FadeInDown.duration(Motion.duration.reveal).delay(Motion.stagger * 5)}>
             <View style={[styles.actionCueCard, { backgroundColor: isEmergency ? Colors.error500 : (isAlert ? Colors.warning500 : Colors.primary500) }]}>
                 {isEmergency || calculations.timeToLeave <= 0 ? (
                     <>
                        <Ionicons name="warning" size={24} color="#fff" />
                        <View style={{flex: 1, marginLeft: 12}}>
-                           <Text style={styles.actionCueTitle}>{isEmergency ? "Proceed Immediately" : "Leave Now"}</Text>
+                           <Text style={styles.actionCueTitle}>{isEmergency ? "Proceed Directly" : "Leave Now"}</Text>
                            <Text style={styles.actionCueSub}>
-                               {isEmergency 
-                                  ? "The clinic is expecting you. Please head to the triage desk upon arrival."
-                                  : "Your buffer time has ended. Please proceed to the clinic immediately."}
+                               The clinic is expecting you. Please head to the triage desk.
                            </Text>
                        </View>
                     </>
@@ -246,63 +225,65 @@ export default function ActiveTokenScreen() {
                     <>
                        <Ionicons name="car-sport" size={24} color="#fff" />
                        <View style={{flex: 1, marginLeft: 12, flexDirection: 'row', alignItems: 'center'}}>
-                           <Text style={styles.actionCueTitle}>Leave in </Text>
-                           <CountUp value={calculations.timeToLeave} duration={300} style={styles.actionCueTitle} />
-                           <Text style={styles.actionCueTitle}> mins</Text>
+                           <Text style={styles.actionCueTitle}>Leave in {calculations.timeToLeave} mins</Text>
                        </View>
                     </>
                 )}
             </View>
         </Animated.View>
 
-        {/* 6. REAL-TIME EVENTS */}
+        {/* REAL-TIME EVENTS */}
         <Animated.View entering={FadeInDown.duration(400).delay(300)} style={styles.eventsCard}>
-             <Text style={styles.eventsTitle}>{isEmergency ? "Priority Status" : "Live Updates"}</Text>
+             <Text style={styles.eventsTitle}>Queue Activity</Text>
              <View style={styles.eventsList}>
-                 {isEmergency ? (
-                     <>
-                        <View style={styles.eventRow}>
-                            <View style={[styles.eventDot, {backgroundColor: Colors.success500}]} />
-                            <Text style={styles.eventText}>Clinic notified of your arrival</Text>
-                        </View>
-                        <View style={styles.eventRow}>
-                            <View style={[styles.eventDot, {backgroundColor: Colors.error500}]} />
-                            <Text style={styles.eventText}>Triage desk alerted</Text>
-                        </View>
-                     </>
-                 ) : (
-                     <>
-                        <View style={styles.eventRow}>
-                            <View style={[styles.eventDot, {backgroundColor: Colors.success500}]} />
-                            <Text style={styles.eventText}>Serving speed increased</Text>
-                        </View>
-                        <View style={styles.eventRow}>
-                            <View style={[styles.eventDot, {backgroundColor: Colors.primary500}]} />
-                            <Text style={styles.eventText}>+2 patients added behind you</Text>
-                        </View>
-                     </>
-                 )}
-                 {!isEmergency && calculations.peopleBefore > 4 && (
-                    <View style={styles.eventRow}>
-                        <View style={[styles.eventDot, {backgroundColor: Colors.warning500}]} />
-                        <Text style={styles.eventText}>⚠️ Minor delay detected (+2 mins)</Text>
-                    </View>
-                 )}
+                 <View style={styles.eventRow}>
+                     <View style={[styles.eventDot, {backgroundColor: Colors.success500}]} />
+                     <Text style={styles.eventText}>Patient #12 just checked in</Text>
+                 </View>
+                 <View style={styles.eventRow}>
+                     <View style={[styles.eventDot, {backgroundColor: Colors.primary500}]} />
+                     <Text style={styles.eventText}>Serving speed improved</Text>
+                 </View>
              </View>
         </Animated.View>
 
-        {/* 7. EMERGENCY ESCAPE */}
+        {/* EMERGENCY ESCAPE */}
         {!activeBooking.isEmergency && (
-             <Animated.View entering={FadeInDown.duration(400).delay(350)} style={{marginTop: 8}}>
+             <Animated.View entering={FadeInDown.duration(400).delay(350)}>
                  <Pressable style={styles.emergencyBtn}>
                      <Ionicons name="medical" size={16} color={Colors.error500} />
                      <Text style={styles.emergencyBtnText}>Need urgent care? Switch to Priority</Text>
                  </Pressable>
              </Animated.View>
         )}
-
       </ScrollView>
-      </Animated.View>
+
+      {/* Premium Cancellation Modal */}
+      <Modal visible={showCancelModal} transparent animationType="fade">
+          <View style={styles.modalOverlay}>
+              <Pressable style={styles.backdrop} onPress={() => setShowCancelModal(false)} />
+              <Animated.View entering={ZoomIn.duration(300)} style={styles.cancellationModal}>
+                  <View style={styles.warningIconContainer}>
+                      <Ionicons name="alert-circle" size={48} color={Colors.error500} />
+                  </View>
+                  <Text style={styles.modalTitle}>Cancel Appointment?</Text>
+                  <Text style={styles.modalSubtitle}>
+                      You will lose your current spot (#<Text style={{fontFamily: 'Inter_700Bold'}}>{activeBooking.tokenNumber}</Text>) and wait time will reset if you join later.
+                  </Text>
+                  
+                  <View style={styles.modalActions}>
+                      <Pressable style={styles.stayBtn} onPress={() => setShowCancelModal(false)}>
+                          <Text style={styles.stayBtnText}>Don't Leave</Text>
+                      </Pressable>
+                      <Pressable style={styles.leaveBtn} onPress={confirmCancel}>
+                          <Text style={styles.leaveBtnText}>Yes, Cancel</Text>
+                      </Pressable>
+                  </View>
+              </Animated.View>
+          </View>
+      </Modal>
+
+    </Animated.View>
   );
 }
 
@@ -313,35 +294,15 @@ const styles = StyleSheet.create({
   scrollContent: { paddingHorizontal: 24, paddingBottom: 60 },
 
   liveStatusContainer: { alignItems: 'center', marginBottom: 24 },
-  liveBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    borderWidth: 1,
-    backgroundColor: Colors.surfacePrimary,
-    marginBottom: 12
-  },
+  liveBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1, backgroundColor: Colors.surfacePrimary, marginBottom: 12 },
   liveDot: { width: 8, height: 8, borderRadius: 4, marginRight: 6 },
   liveText: { fontFamily: 'Inter_700Bold', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1 },
-  servingText: {
-    ...Typography.numbers,
-    fontSize: 24,
-    lineHeight: 30,
-    color: Colors.textPrimary,
-    marginBottom: 4
-  },
+  servingText: { fontFamily: 'Inter_800ExtraBold', fontSize: 24, lineHeight: 30, color: Colors.textPrimary, marginBottom: 4 },
   updateText: { fontFamily: 'Inter_500Medium', fontSize: 13, color: Colors.textTertiary },
 
   heroContainer: { alignItems: 'center', marginBottom: 24 },
   heroLabel: { fontFamily: 'Inter_600SemiBold', fontSize: 13, color: Colors.textSecondary, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 },
-  heroValue: {
-    ...Typography.numbers,
-    fontSize: 80,
-    lineHeight: 92,
-    color: Colors.textPrimary,
-  },
+  heroValue: { fontFamily: 'Inter_800ExtraBold', fontSize: 80, lineHeight: 92, color: Colors.textPrimary },
   aheadBadge: { backgroundColor: Colors.surfacePrimary, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: Colors.borderLight, marginTop: 8 },
   aheadText: { fontFamily: 'Inter_700Bold', fontSize: 14, color: Colors.textSecondary },
 
@@ -373,4 +334,16 @@ const styles = StyleSheet.create({
 
   emergencyBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: Colors.error100, paddingVertical: 16, borderRadius: 16, borderWidth: 1, borderColor: Colors.error500 },
   emergencyBtnText: { fontFamily: 'Inter_700Bold', fontSize: 14, color: Colors.error500 },
+
+  modalOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)' },
+  backdrop: { ...StyleSheet.absoluteFillObject },
+  cancellationModal: { width: width * 0.85, backgroundColor: Colors.surfacePrimary, borderRadius: 32, padding: 32, alignItems: 'center', ...Colors.shadows.lg },
+  warningIconContainer: { width: 80, height: 80, borderRadius: 40, backgroundColor: Colors.error100, justifyContent: 'center', alignItems: 'center', marginBottom: 24 },
+  modalTitle: { fontFamily: 'Inter_800ExtraBold', fontSize: 24, color: Colors.textPrimary, marginBottom: 12 },
+  modalSubtitle: { fontFamily: 'Inter_500Medium', fontSize: 15, color: Colors.textSecondary, textAlign: 'center', lineHeight: 22, marginBottom: 32 },
+  modalActions: { width: '100%', gap: 12 },
+  stayBtn: { width: '100%', height: 56, backgroundColor: Colors.gray100, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
+  stayBtnText: { fontFamily: 'Inter_700Bold', fontSize: 16, color: Colors.textPrimary },
+  leaveBtn: { width: '100%', height: 56, backgroundColor: Colors.error500, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
+  leaveBtnText: { fontFamily: 'Inter_700Bold', fontSize: 16, color: '#fff' },
 });

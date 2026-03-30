@@ -31,14 +31,14 @@ export function StatusBadge({ status, text }: StatusBadgeProps) {
     const getConfig = () => {
         switch (status) {
             case 'live':
-                return { bg: Colors.status.success.bg, text: Colors.status.success.dot, label: 'Live' };
+                return { bg: Colors.success100, text: Colors.success500, label: 'Live' };
             case 'alert':
-                return { bg: Colors.status.warning.bg, text: Colors.status.warning.dot, label: 'Delayed' };
+                return { bg: Colors.warning100, text: Colors.warning500, label: 'Delayed' };
             case 'success':
-                return { bg: Colors.status.success.bg, text: Colors.status.success.dot, label: 'Completed' };
+                return { bg: Colors.success100, text: Colors.success500, label: 'Completed' };
             case 'waiting':
             default:
-                return { bg: Colors.status.info.bg, text: Colors.status.info.dot, label: 'Waiting' };
+                return { bg: Colors.primary100, text: Colors.primary500, label: 'Waiting' };
         }
     };
 

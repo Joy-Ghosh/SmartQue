@@ -1,15 +1,19 @@
-import React, { useState } from 'react';
-import { StyleSheet, Text, View, ScrollView, Pressable, Platform, StatusBar } from 'react-native';
+import React, { useState, useCallback } from 'react';
+import { StyleSheet, Text, View, ScrollView, Pressable, Platform, StatusBar, Modal, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import Animated, { FadeInDown, ZoomIn } from 'react-native-reanimated';
+import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
 import { Layout } from '@/constants/layout';
 import { Typography } from '@/constants/styles';
 import { useQueue } from '@/lib/queue-context';
 import { GlassView } from '@/components/ui/GlassView';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+
+const { width } = Dimensions.get('window');
 
 const SegmentedControl = ({ activeTab, onChange }: { activeTab: string, onChange: (tab: string) => void }) => {
     return (
@@ -35,8 +39,19 @@ const SegmentedControl = ({ activeTab, onChange }: { activeTab: string, onChange
 export default function AppointmentsScreen() {
     const insets = useSafeAreaInsets();
     const router = useRouter();
-    const { activeBooking, pastBookings } = useQueue();
+    const { activeBooking, pastBookings, cancelBooking } = useQueue();
     const [activeTab, setActiveTab] = useState<'upcoming' | 'history'>('upcoming');
+    const [showCancelModal, setShowCancelModal] = useState(false);
+
+    const handleCancelPress = useCallback(() => {
+        if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        setShowCancelModal(true);
+    }, []);
+
+    const confirmCancel = () => {
+        cancelBooking();
+        setShowCancelModal(false);
+    };
 
     return (
         <View style={styles.container}>
@@ -59,40 +74,47 @@ export default function AppointmentsScreen() {
                 {activeTab === 'upcoming' ? (
                     <View style={styles.listContainer}>
                         {activeBooking ? (
-                            <Pressable onPress={() => router.push('/active-token')}>
-                                <LinearGradient
-                                    colors={activeBooking.isEmergency ? Colors.gradients.danger : Colors.gradients.primary}
-                                    style={styles.activeCard}
-                                    start={{ x: 0, y: 0 }}
-                                    end={{ x: 1, y: 1 }}
-                                >
-                                    <View style={styles.activeCardHeader}>
-                                        <View style={styles.activeTag}>
-                                            <View style={[styles.activeDot, activeBooking.isEmergency && { backgroundColor: Colors.error500 }]} />
-                                            <Text style={[styles.activeTagText, activeBooking.isEmergency && { color: Colors.error500 }]}>
-                                                {activeBooking.isEmergency ? 'EMERGENCY' : 'LIVE NOW'}
-                                            </Text>
+                            <View style={styles.cardContainer}>
+                                <Pressable onPress={() => router.push('/active-token')}>
+                                    <LinearGradient
+                                        colors={activeBooking.isEmergency ? Colors.gradients.danger : Colors.gradients.primary}
+                                        style={styles.activeCard}
+                                        start={{ x: 0, y: 0 }}
+                                        end={{ x: 1, y: 1 }}
+                                    >
+                                        <View style={styles.activeCardHeader}>
+                                            <View style={styles.activeTag}>
+                                                <View style={[styles.activeDot, activeBooking.isEmergency && { backgroundColor: Colors.error500 }]} />
+                                                <Text style={[styles.activeTagText, activeBooking.isEmergency && { color: Colors.error500 }]}>
+                                                    {activeBooking.isEmergency ? 'EMERGENCY' : 'LIVE NOW'}
+                                                </Text>
+                                            </View>
+                                            <Ionicons name="chevron-forward" size={20} color="#fff" />
                                         </View>
-                                        <Ionicons name="chevron-forward" size={20} color="#fff" />
-                                    </View>
 
-                                    <View>
-                                        <Text style={styles.activeClinic}>{activeBooking.clinicName}</Text>
-                                        <Text style={styles.activeDoctor}>{activeBooking.doctorName}</Text>
-                                    </View>
-
-                                    <View style={styles.tokenRow}>
                                         <View>
-                                            <Text style={styles.tokenLabel}>YOUR TOKEN</Text>
-                                            <Text style={styles.tokenValue}>#{activeBooking.tokenNumber}</Text>
+                                            <Text style={styles.activeClinic}>{activeBooking.clinicName}</Text>
+                                            <Text style={styles.activeDoctor}>{activeBooking.doctorName}</Text>
                                         </View>
-                                        <View style={styles.servingInfo}>
-                                            <Text style={styles.servingLabel}>Serving Now</Text>
-                                            <Text style={styles.servingValue}>#{activeBooking.servingToken}</Text>
+
+                                        <View style={styles.tokenRow}>
+                                            <View>
+                                                <Text style={styles.tokenLabel}>YOUR TOKEN</Text>
+                                                <Text style={styles.tokenValue}>#{activeBooking.tokenNumber}</Text>
+                                            </View>
+                                            <View style={styles.servingInfo}>
+                                                <Text style={styles.servingLabel}>Serving Now</Text>
+                                                <Text style={styles.servingValue}>#{activeBooking.servingToken}</Text>
+                                            </View>
                                         </View>
-                                    </View>
-                                </LinearGradient>
-                            </Pressable>
+                                    </LinearGradient>
+                                </Pressable>
+                                
+                                <Pressable style={styles.cancelLink} onPress={handleCancelPress}>
+                                    <Ionicons name="trash-outline" size={16} color={Colors.textMuted} />
+                                    <Text style={styles.cancelLinkText}>Cancel Appointment</Text>
+                                </Pressable>
+                            </View>
                         ) : (
                             <View style={styles.emptyState}>
                                 <View style={styles.emptyIcon}>
@@ -137,6 +159,33 @@ export default function AppointmentsScreen() {
                     </View>
                 )}
             </ScrollView>
+
+            {/* Confirmation Modal */}
+            <Modal visible={showCancelModal} transparent animationType="fade">
+                <View style={styles.modalOverlay}>
+                    <Pressable style={styles.backdrop} onPress={() => setShowCancelModal(false)} />
+                    <Animated.View entering={ZoomIn.duration(300)} style={styles.cancellationModal}>
+                        <View style={styles.warningIconContainer}>
+                            <Ionicons name="alert-circle" size={48} color={Colors.error500} />
+                        </View>
+                        <Text style={styles.modalTitle}>Cancel Appointment?</Text>
+                        {activeBooking && (
+                            <Text style={styles.modalSubtitle}>
+                                You will lose your current spot (#<Text style={{fontFamily: 'Inter_700Bold'}}>{activeBooking.tokenNumber}</Text>) and wait time will reset if you join later.
+                            </Text>
+                        )}
+                        
+                        <View style={styles.modalActions}>
+                            <Pressable style={styles.stayBtn} onPress={() => setShowCancelModal(false)}>
+                                <Text style={styles.stayBtnText}>Don't Leave</Text>
+                            </Pressable>
+                            <Pressable style={styles.leaveBtn} onPress={confirmCancel}>
+                                <Text style={styles.leaveBtnText}>Yes, Cancel</Text>
+                            </Pressable>
+                        </View>
+                    </Animated.View>
+                </View>
+            </Modal>
         </View>
     );
 }
@@ -204,6 +253,9 @@ const styles = StyleSheet.create({
     },
     listContainer: {
         gap: 16,
+    },
+    cardContainer: {
+        gap: 12,
     },
     // Active Card
     activeCard: {
@@ -282,6 +334,18 @@ const styles = StyleSheet.create({
         fontSize: 18,
         color: Colors.textOnColor,
     },
+    cancelLink: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 6,
+        paddingVertical: 8,
+    },
+    cancelLinkText: {
+        fontFamily: 'Inter_600SemiBold',
+        fontSize: 13,
+        color: Colors.textMuted,
+    },
     // History Card
     historyCard: {
         flexDirection: 'row',
@@ -355,4 +419,18 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         color: Colors.textMuted,
     },
+
+    // Modal Styles
+    modalOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)' },
+    backdrop: { ...StyleSheet.absoluteFillObject },
+    cancellationModal: { width: width * 0.85, backgroundColor: Colors.surfacePrimary, borderRadius: 32, padding: 32, alignItems: 'center', ...Colors.shadows.lg },
+    warningIconContainer: { width: 80, height: 80, borderRadius: 40, backgroundColor: Colors.error100, justifyContent: 'center', alignItems: 'center', marginBottom: 24 },
+    modalTitle: { fontFamily: 'Inter_800ExtraBold', fontSize: 24, color: Colors.textPrimary, marginBottom: 12 },
+    modalSubtitle: { fontFamily: 'Inter_500Medium', fontSize: 15, color: Colors.textSecondary, textAlign: 'center', lineHeight: 22, marginBottom: 32 },
+    modalActions: { width: '100%', gap: 12 },
+    stayBtn: { width: '100%', height: 56, backgroundColor: Colors.gray100, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
+    stayBtnText: { fontFamily: 'Inter_700Bold', fontSize: 16, color: Colors.textPrimary },
+    leaveBtn: { width: '100%', height: 56, backgroundColor: Colors.error500, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
+    leaveBtnText: { fontFamily: 'Inter_700Bold', fontSize: 16, color: '#fff' },
 });
+

@@ -29,6 +29,7 @@ import Colors from '@/constants/colors';
 import { clinics, getClinicDoctor } from '@/lib/data';
 import { useQueue } from '@/lib/queue-context';
 import { Motion } from '@/constants/motion';
+import { Typography } from '@/constants/styles';
 import { AnimatedButton } from '@/components/AnimatedButton';
 import { CountUp } from '@/components/CountUp';
 import SmartBookingSheet from '@/components/booking/SmartBookingSheet';
@@ -69,9 +70,15 @@ function ReviewCard({ name, text, rating }: { name: string; text: string; rating
 }
 
 export default function ClinicDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, emergency } = useLocalSearchParams<{ id: string, emergency?: string }>();
   const insets = useSafeAreaInsets();
   const { activeBooking, setActiveBooking } = useQueue();
+
+  useEffect(() => {
+    if (emergency === 'true') {
+        setIsEmergency(true);
+    }
+  }, [emergency]);
 
   const clinic = clinics.find((c) => c.id === id);
   const doctor = clinic ? getClinicDoctor(clinic.id) : undefined;
@@ -84,8 +91,10 @@ export default function ClinicDetailScreen() {
 
   // Queue data
   const currentToken = 12;
-  const yourToken = clinic ? clinic.currentQueueLength + 11 : 23;
-  const peopleAhead = yourToken - currentToken - 1;
+  // If emergency, your token is prioritized right after current
+  const baseToken = clinic ? clinic.currentQueueLength + 11 : 23;
+  const yourToken = isEmergency ? currentToken + 1 : baseToken;
+  const peopleAhead = isEmergency ? 0 : yourToken - currentToken - 1;
 
   // Pulse animation for the "live" dot
   const dotOpacity = useSharedValue(1);
@@ -143,7 +152,27 @@ export default function ClinicDetailScreen() {
 
   const isInQueueForThisClinic = activeBooking?.clinicId === clinic.id;
   const consultationFee = clinic.pricing?.consultation || doctor.fee;
-  const totalFee = clinic.pricing?.total || (doctor.fee + 49);
+
+  // Visit Intelligence Calculations
+  const currentWaitTime = clinic.avgWaitTimePerPatient * clinic.currentQueueLength;
+  const visitTime = new Date(Date.now() + currentWaitTime * 60000);
+  const estimatedVisitFormatted = visitTime.toLocaleTimeString([], { 
+    hour: '2-digit', 
+    minute: '2-digit',
+    hour12: true 
+  });
+  
+  // Logic for comparison: later wait is always longer (peak simulation)
+  const laterWaitTime = currentWaitTime + (clinic.state === 'booking_open' ? 10 : 25);
+  // Travel calculation
+  const leaveInMins = Math.max(5, currentWaitTime - 20 - 5);
+  
+  // Dynamic pricing for emergency
+  const platformFee = clinic.pricing?.platformFee || 49;
+  const emergencyPremium = clinic.pricing?.emergencyPremium || 150;
+  const totalFee = isEmergency 
+    ? (consultationFee + platformFee + emergencyPremium)
+    : (consultationFee + platformFee);
 
   return (
     <View style={styles.container}>
@@ -182,9 +211,9 @@ export default function ClinicDetailScreen() {
 
         {/* Hero Identity (overlaid at bottom of hero) */}
         <Animated.View entering={FadeIn.duration(500)} style={styles.heroIdentity}>
-          <View style={styles.heroStatusPill}>
-            <Animated.View style={[styles.heroPillDot, liveDotStyle]} />
-            <Text style={styles.heroStatusText}>In Cabin</Text>
+          <View style={[styles.heroStatusPill, isEmergency && { backgroundColor: Colors.error100 }]}>
+            <Animated.View style={[styles.heroPillDot, { backgroundColor: isEmergency ? Colors.error500 : Colors.success500 }, liveDotStyle]} />
+            <Text style={[styles.heroStatusText, isEmergency && { color: Colors.error700 }]}>{isEmergency ? 'EMERGENCY READY' : 'In Cabin'}</Text>
           </View>
           <Text style={styles.heroDoctorName}>{doctor.name}</Text>
           <View style={styles.heroMetaRow}>
@@ -220,33 +249,71 @@ export default function ClinicDetailScreen() {
           </View>
         </Animated.View>
 
-        {/* ── DECISION BLOCK (HERO) ── */}
-        <Animated.View entering={FadeInDown.duration(Motion.duration.reveal).delay(Motion.stagger * 2)} style={styles.decisionHero}>
-          <Text style={styles.decisionLabel}>If you join now</Text>
+        {/* ── DECISION BLOCK (Action-Oriented) ── */}
+        <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionTitleSmall}>Your Visit Plan</Text>
+            <View style={styles.trustLine}>
+                <Ionicons name="information-circle-outline" size={14} color={Colors.gray400} />
+                <Text style={styles.trustLineText}>Based on live queue</Text>
+            </View>
+        </View>
 
-          {/* Big Position Number */}
-          <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'center'}}>
-              <Text style={styles.decisionPosition}>#</Text>
-              <CountUp value={yourToken} duration={800} style={styles.decisionPosition} />
+        <Animated.View 
+            entering={FadeInDown.duration(Motion.duration.reveal).delay(Motion.stagger * 2)} 
+            style={[styles.visitPlanCard, isEmergency && { backgroundColor: Colors.error100, borderColor: Colors.error500 + '30' }]}
+        >
+          <View style={styles.planHero}>
+            <View style={{flex: 1}}>
+                <Text style={styles.planTokenLabel}>You will be</Text>
+                <View style={styles.planTokenRow}>
+                    <Text style={[styles.planTokenHash, isEmergency && { color: Colors.error500 }]}>#</Text>
+                    {isEmergency ? (
+                        <Text style={[styles.planTokenValue, { color: Colors.error500, fontSize: 32 }]}>PRIORITY</Text>
+                    ) : (
+                        <CountUp value={yourToken} duration={800} style={styles.planTokenValue} />
+                    )}
+                </View>
+            </View>
+            <View style={styles.planMainMetrics}>
+                <View style={styles.planMetricItem}>
+                    <Text style={styles.planMetricLabel}>Estimated visit</Text>
+                    <Text style={[styles.planMetricValue, isEmergency && { color: Colors.error700 }]}>
+                        {isEmergency ? 'Immediate' : estimatedVisitFormatted}
+                    </Text>
+                </View>
+                <View style={[styles.planMetricItem, styles.planMetricHighlight, isEmergency && { backgroundColor: Colors.error500 + '20' }]}>
+                    <Text style={[styles.planMetricLabel, {color: isEmergency ? Colors.error700 : Colors.primary700}]}>Leave in</Text>
+                    <Text style={[styles.planMetricValue, {color: isEmergency ? Colors.error700 : Colors.primary700}]}>
+                        {isEmergency ? 'Now' : `${leaveInMins} mins`}
+                    </Text>
+                </View>
+            </View>
           </View>
 
-          {/* Time pair */}
-          <View style={styles.decisionTimePair}>
-            <View style={styles.decisionTimeItem}>
-              <Text style={styles.decisionTimeValue}>6:40 PM</Text>
-              <Text style={styles.decisionTimeLabel}>Visit</Text>
-            </View>
-            <View style={styles.decisionTimeSep} />
-            <View style={styles.decisionTimeItem}>
-              <Text style={[styles.decisionTimeValue, { color: Colors.primary500 }]}>1h 20m</Text>
-              <Text style={[styles.decisionTimeLabel, { color: Colors.primary500, fontFamily: 'Inter_600SemiBold' }]}>Leave in</Text>
-            </View>
-          </View>
+          <View style={styles.planDivider} />
 
-          {/* Subtle price line */}
-          <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'center'}}>
-              <Text style={styles.decisionPriceLine}>Consultation ₹</Text>
-              <CountUp value={consultationFee} duration={400} style={styles.decisionPriceLine} />
+          {!isEmergency && (
+            <>
+              <View style={styles.comparisonRow}>
+                <View style={styles.comparisonItem}>
+                    <Text style={styles.comparisonLabel}>If you go now</Text>
+                    <Text style={[styles.comparisonValue, {color: Colors.success500}]}>{currentWaitTime} min wait</Text>
+                </View>
+                <View style={styles.comparisonSep} />
+                <View style={styles.comparisonItem}>
+                    <Text style={styles.comparisonLabel}>If you go later</Text>
+                    <Text style={[styles.comparisonValue, {color: Colors.warning500}]}>{laterWaitTime} min wait</Text>
+                </View>
+              </View>
+              <View style={styles.planDivider} />
+            </>
+          )}
+
+          <View style={styles.planFooter}>
+              <Text style={[styles.planComfortText, isEmergency && { color: Colors.error700 }]}>
+                  {isEmergency ? 'Critical path active — Go directly to entrance' : 'You’ll arrive just in time — no waiting at clinic'}
+              </Text>
+              <Text style={styles.planPriceText}>Consultation ₹{consultationFee}</Text>
           </View>
         </Animated.View>
 
@@ -291,12 +358,21 @@ export default function ClinicDetailScreen() {
               <View style={styles.compactSep} />
               <View style={styles.compactRow}>
                 <Text style={styles.compactLabel}>Platform fee</Text>
-                <Text style={styles.compactValue}>₹{clinic.pricing?.platformFee || 49}</Text>
+                <Text style={styles.compactValue}>₹{platformFee}</Text>
               </View>
+              {isEmergency && (
+                  <>
+                    <View style={styles.compactSep} />
+                    <View style={styles.compactRow}>
+                        <Text style={[styles.compactLabel, { color: Colors.error500 }]}>Emergency Priority</Text>
+                        <Text style={[styles.compactValue, { color: Colors.error500 }]}>₹{emergencyPremium}</Text>
+                    </View>
+                  </>
+              )}
               <View style={styles.compactSep} />
               <View style={styles.compactRow}>
                 <Text style={[styles.compactLabel, { fontFamily: 'Inter_700Bold', color: Colors.textPrimary }]}>Total</Text>
-                <Text style={[styles.compactValue, { color: Colors.primary700, fontFamily: 'Inter_700Bold' }]}>₹{totalFee}</Text>
+                <Text style={[styles.compactValue, { color: isEmergency ? Colors.error700 : Colors.primary700, fontFamily: 'Inter_700Bold' }]}>₹{totalFee}</Text>
               </View>
               <View style={styles.payNote}>
                 <Ionicons name="shield-checkmark" size={13} color={Colors.success500} />
@@ -361,11 +437,11 @@ export default function ClinicDetailScreen() {
           </AnimatedButton>
         ) : (
           <AnimatedButton
-            style={styles.bottomBarBtn}
-            onPress={handleOpenBookingSheet}
+            style={[styles.bottomBarBtn, isEmergency && { backgroundColor: Colors.error500 }]}
+            onPress={isEmergency ? handleEmergency : handleOpenBookingSheet}
           >
-            <Ionicons name="enter-outline" size={18} color="#fff" />
-            <Text style={styles.bottomBarBtnText}>Join Queue</Text>
+            <Ionicons name={isEmergency ? "flash" : "enter-outline"} size={18} color="#fff" />
+            <Text style={styles.bottomBarBtnText}>{isEmergency ? "Join Emergency Queue" : "Join Queue"}</Text>
           </AnimatedButton>
         )}
         <Text style={styles.bottomBarMicro}>No waiting at clinic  ·  We'll notify you</Text>
@@ -475,36 +551,79 @@ const styles = StyleSheet.create({
   liveStripRight: {},
   liveStripMeta: { fontFamily: 'Inter_500Medium', fontSize: 12, color: Colors.gray500 },
 
-  // ── DECISION HERO ──
-  decisionHero: {
-    backgroundColor: Colors.surfacePrimary,
-    borderRadius: 24,
-    paddingVertical: 28, paddingHorizontal: 24,
-    alignItems: 'center',
-    borderWidth: 1, borderColor: Colors.gray200,
+  // ── VISIT PLAN (REFINED) ──
+  sectionHeaderRow: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end',
+    marginBottom: 12,
+  },
+  sectionTitleSmall: {
+    fontFamily: Typography.fontFamily.semiBold, fontSize: 13, color: Colors.textSecondary,
+    textTransform: 'uppercase', letterSpacing: 0.5,
+  },
+  trustLine: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  trustLineText: {
+    fontFamily: Typography.fontFamily.medium, fontSize: 11, color: Colors.gray400,
+  },
+  visitPlanCard: {
+    backgroundColor: '#F8FAFF', // Very subtle blue tint
+    borderRadius: 20,
+    padding: 20,
+    borderWidth: 1, borderColor: '#EBF2FF',
     ...Colors.shadows.sm,
   },
-  decisionLabel: {
-    fontFamily: 'Inter_600SemiBold', fontSize: 13, color: Colors.gray500,
-    textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4,
+  planHero: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
   },
-  decisionPosition: {
-    fontFamily: 'Inter_800ExtraBold', fontSize: 80, color: Colors.textPrimary,
-    letterSpacing: -3, lineHeight: 88,
+  planTokenLabel: {
+    fontFamily: Typography.fontFamily.medium, fontSize: 12, color: Colors.gray500,
+    marginBottom: 4,
   },
-  decisionTimePair: {
-    flexDirection: 'row', alignItems: 'center', gap: 36, marginTop: 12,
+  planTokenRow: { flexDirection: 'row', alignItems: 'center' },
+  planTokenHash: {
+    fontFamily: Typography.fontFamily.extraBold, fontSize: 24, color: Colors.textPrimary,
+    marginTop: 4, marginRight: 2,
   },
-  decisionTimeItem: { alignItems: 'center' },
-  decisionTimeValue: {
-    fontFamily: 'Inter_800ExtraBold', fontSize: 20, color: Colors.textPrimary,
+  planTokenValue: {
+    fontFamily: Typography.fontFamily.extraBold, fontSize: 44, color: Colors.textPrimary,
+    letterSpacing: -1,
   },
-  decisionTimeLabel: {
-    fontFamily: 'Inter_500Medium', fontSize: 12, color: Colors.gray500, marginTop: 3,
+  planMainMetrics: { gap: 12 },
+  planMetricItem: { alignItems: 'flex-end' },
+  planMetricLabel: {
+    fontFamily: Typography.fontFamily.medium, fontSize: 11, color: Colors.gray400,
+    textTransform: 'uppercase', marginBottom: 2,
   },
-  decisionTimeSep: { width: 1, height: 32, backgroundColor: Colors.gray200 },
-  decisionPriceLine: {
-    fontFamily: 'Inter_500Medium', fontSize: 13, color: Colors.gray500, marginTop: 14,
+  planMetricValue: {
+    fontFamily: Typography.fontFamily.bold, fontSize: 16, color: Colors.textPrimary,
+  },
+  planMetricHighlight: {
+    backgroundColor: Colors.primary100,
+    paddingHorizontal: 12, paddingVertical: 6,
+    borderRadius: 8,
+  },
+  planDivider: {
+    height: 1, backgroundColor: 'rgba(0,0,0,0.04)', marginVertical: 16,
+  },
+  comparisonRow: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+  },
+  comparisonItem: { flex: 1, alignItems: 'center' },
+  comparisonLabel: {
+    fontFamily: Typography.fontFamily.medium, fontSize: 11, color: Colors.gray500,
+    marginBottom: 4,
+  },
+  comparisonValue: {
+    fontFamily: Typography.fontFamily.bold, fontSize: 14,
+  },
+  comparisonSep: { width: 1, height: 24, backgroundColor: 'rgba(0,0,0,0.04)' },
+  planFooter: { gap: 8 },
+  planComfortText: {
+    fontFamily: Typography.fontFamily.medium, fontSize: 12, color: Colors.primary600,
+    textAlign: 'center',
+  },
+  planPriceText: {
+    fontFamily: Typography.fontFamily.bold, fontSize: 11, color: Colors.gray400,
+    textAlign: 'center', textTransform: 'uppercase', letterSpacing: 1,
   },
 
   // ── EMERGENCY ──
@@ -520,7 +639,7 @@ const styles = StyleSheet.create({
   sectionDivider: { height: 1, backgroundColor: Colors.gray200, marginVertical: 4 },
   sectionTitle: { fontFamily: 'Inter_700Bold', fontSize: 16, color: Colors.textPrimary, marginBottom: 12 },
 
-  // ── COMPACT CARD (shared) ──
+  // ── QUEUE SNAPSHOT (compact, secondary) ──
   compactCard: {
     backgroundColor: Colors.surfacePrimary, borderRadius: 16,
     borderWidth: 1, borderColor: Colors.gray200, overflow: 'hidden',

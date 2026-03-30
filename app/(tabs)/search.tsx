@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
     StyleSheet,
     Text,
@@ -8,49 +8,80 @@ import {
     Image,
     TextInput,
     StatusBar,
+    Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Link } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import Animated, { FadeInDown, Layout as ReanimatedLayout } from 'react-native-reanimated';
+import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
 import { Layout } from '@/constants/layout';
+import { GlassView } from '@/components/ui/GlassView';
 
-import { clinics, getClinicDoctor } from '@/lib/data';
+import { clinics, getClinicDoctor, Clinic } from '@/lib/data';
 
 const FILTERS = ['All', 'General', 'Dental', 'Skin', 'Cardio', 'Pediatric', 'Lab Tests', 'Open Now', 'Wait <30m'];
+const SORT_OPTIONS = [
+    { id: 'distance', label: 'Nearest', icon: 'location' },
+    { id: 'wait', label: 'Shortest Queue', icon: 'time' },
+    { id: 'rating', label: 'Top Rated', icon: 'star' },
+];
 
 export default function SearchScreen() {
     const insets = useSafeAreaInsets();
     const [searchQuery, setSearchQuery] = useState('');
     const [activeFilter, setActiveFilter] = useState('All');
+    const [sortBy, setSortBy] = useState('distance');
 
-    const filteredClinics = clinics.filter((clinic) => {
-        const docName = getClinicDoctor(clinic.id)?.name || '';
-        const matchesSearch = clinic.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            docName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            clinic.type.toLowerCase().includes(searchQuery.toLowerCase());
+    const processedClinics = useMemo(() => {
+        // 1. Filter
+        let result = clinics.filter((clinic) => {
+            const docName = getClinicDoctor(clinic.id)?.name || '';
+            const matchesSearch = clinic.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                docName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                clinic.type.toLowerCase().includes(searchQuery.toLowerCase());
 
-        if (!matchesSearch) return false;
+            if (!matchesSearch) return false;
 
-        if (activeFilter === 'General') return clinic.type.includes('general');
-        if (activeFilter === 'Dental') return clinic.type.includes('dental');
-        if (activeFilter === 'Skin') return clinic.type.includes('dermatology') || clinic.type.includes('skin');
-        if (activeFilter === 'Cardio') return clinic.type.includes('cardio');
-        if (activeFilter === 'Pediatric') return clinic.type.includes('pediatric');
-        if (activeFilter === 'Lab Tests') return clinic.type.includes('lab');
-        if (activeFilter === 'Open Now') return clinic.state === 'live' || clinic.state === 'booking_open';
-        
-        const waitTime = clinic.currentQueueLength * clinic.avgWaitTimePerPatient;
-        if (activeFilter === 'Wait <30m') return waitTime < 30;
+            if (activeFilter === 'General') return clinic.type.includes('general');
+            if (activeFilter === 'Dental') return clinic.type.includes('dental');
+            if (activeFilter === 'Skin') return clinic.type.includes('dermatology') || clinic.type.includes('skin');
+            if (activeFilter === 'Cardio') return clinic.type.includes('cardio');
+            if (activeFilter === 'Pediatric') return clinic.type.includes('pediatric');
+            if (activeFilter === 'Lab Tests') return clinic.type.includes('lab');
+            if (activeFilter === 'Open Now') return clinic.state === 'live' || clinic.state === 'booking_open';
+            
+            const waitTime = clinic.currentQueueLength * clinic.avgWaitTimePerPatient;
+            if (activeFilter === 'Wait <30m') return waitTime < 30;
 
-        return true;
-    });
+            return true;
+        });
+
+        // 2. Sort
+        result.sort((a, b) => {
+            if (sortBy === 'distance') return a.distance - b.distance;
+            if (sortBy === 'wait') {
+                const waitA = a.currentQueueLength * a.avgWaitTimePerPatient;
+                const waitB = b.currentQueueLength * b.avgWaitTimePerPatient;
+                return waitA - waitB;
+            }
+            if (sortBy === 'rating') return b.rating - a.rating;
+            return 0;
+        });
+
+        return result;
+    }, [searchQuery, activeFilter, sortBy]);
 
     const getStatusConfig = (mins: number) => {
         if (mins < 15) return { bg: Colors.success100, text: Colors.success500, dot: Colors.success500, label: `<15m` };
         if (mins < 60) return { bg: Colors.warning100, text: Colors.warning500, dot: Colors.warning500, label: `~${mins}m` };
         return { bg: Colors.error100, text: Colors.error500, dot: Colors.error500, label: `1h+` };
+    };
+
+    const handleSortChange = (id: string) => {
+        if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        setSortBy(id);
     };
 
     return (
@@ -60,10 +91,10 @@ export default function SearchScreen() {
             {/* Header */}
             <View style={styles.header}>
                 <Text style={styles.headerTitle}>Explore Clinics</Text>
-                <Text style={styles.headerSub}>Find the shortest queue near you</Text>
+                <Text style={styles.headerSub}>Find the smartest care near you</Text>
             </View>
 
-            {/* Search */}
+            {/* Search & Sort Section */}
             <View style={styles.searchSection}>
                 <View style={styles.searchBar}>
                     <Ionicons name="search" size={18} color={Colors.textMuted} />
@@ -81,6 +112,7 @@ export default function SearchScreen() {
                     )}
                 </View>
 
+                {/* Categories Scroll */}
                 <ScrollView
                     horizontal
                     showsHorizontalScrollIndicator={false}
@@ -106,17 +138,52 @@ export default function SearchScreen() {
                         </Pressable>
                     ))}
                 </ScrollView>
+
+                {/* Sort Bar */}
+                <View style={styles.sortContainer}>
+                    <Text style={styles.sortLabel}>Sort by:</Text>
+                    <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.sortScroll}
+                    >
+                        {SORT_OPTIONS.map((opt) => (
+                            <Pressable
+                                key={opt.id}
+                                style={[
+                                    styles.sortChip,
+                                    sortBy === opt.id && styles.activeSortChip,
+                                ]}
+                                onPress={() => handleSortChange(opt.id)}
+                            >
+                                <Ionicons 
+                                    name={opt.icon as any} 
+                                    size={12} 
+                                    color={sortBy === opt.id ? '#fff' : Colors.textSecondary} 
+                                />
+                                <Text
+                                    style={[
+                                        styles.sortText,
+                                        sortBy === opt.id && styles.activeSortText,
+                                    ]}
+                                >
+                                    {opt.label}
+                                </Text>
+                            </Pressable>
+                        ))}
+                    </ScrollView>
+                </View>
             </View>
 
             {/* Results count */}
             <View style={styles.resultsRow}>
-                <Text style={styles.resultsText}>{filteredClinics.length} clinic{filteredClinics.length !== 1 ? 's' : ''} found</Text>
+                <Text style={styles.resultsText}>{processedClinics.length} clinic{processedClinics.length !== 1 ? 's' : ''} found</Text>
             </View>
 
             {/* Clinic List */}
             <ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
-                {filteredClinics.length > 0 ? (
-                    filteredClinics.map((clinic, index) => {
+                {processedClinics.length > 0 ? (
+                    processedClinics.map((clinic, index) => {
                         const waitTime = clinic.currentQueueLength * clinic.avgWaitTimePerPatient;
                         const status = getStatusConfig(waitTime);
                         const docName = getClinicDoctor(clinic.id)?.name || 'Unknown Doctor';
@@ -126,6 +193,7 @@ export default function SearchScreen() {
                         return (
                             <Animated.View
                                 key={clinic.id}
+                                layout={ReanimatedLayout.springify()}
                                 entering={FadeInDown.duration(400).delay((index % 5) * 80)}
                             >
                                 <Link href={`/clinic/${clinic.id}` as any} asChild>
@@ -139,14 +207,14 @@ export default function SearchScreen() {
                                                     <Text style={[styles.clinicSpecialty, {textTransform: 'capitalize'}]}>{clinic.type} • {docName}</Text>
                                                 </View>
                                                 <View style={styles.ratingBadge}>
-                                                    <Ionicons name="star" size={10} color={Colors.warning500} />
+                                                    <Ionicons name="star" size={10} color={Colors.warning700} />
                                                     <Text style={styles.ratingText}>{clinic.rating}</Text>
                                                 </View>
                                             </View>
 
                                             <View style={styles.clinicFooter}>
                                                 <View style={styles.distanceBadge}>
-                                                    <Ionicons name="location-outline" size={11} color={Colors.textSecondary} />
+                                                    <Ionicons name="location" size={12} color={Colors.primary500} />
                                                     <Text style={styles.distanceText}>{clinic.distance} km</Text>
                                                 </View>
 
@@ -198,8 +266,8 @@ const styles = StyleSheet.create({
         marginTop: 2,
     },
     searchSection: {
-        paddingBottom: 10,
-        gap: 10,
+        paddingBottom: 4,
+        gap: 12,
     },
     searchBar: {
         flexDirection: 'row',
@@ -242,6 +310,46 @@ const styles = StyleSheet.create({
         color: Colors.textSecondary,
     },
     activeFilterText: {
+        color: '#fff',
+    },
+    sortContainer: {
+        paddingHorizontal: Layout.grid.margin,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+    },
+    sortLabel: {
+        fontFamily: 'Inter_700Bold',
+        fontSize: 11,
+        color: Colors.textTertiary,
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+    },
+    sortScroll: {
+        gap: 8,
+        paddingRight: 20,
+    },
+    sortChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 20,
+        backgroundColor: Colors.gray100,
+        borderWidth: 1,
+        borderColor: 'transparent',
+    },
+    activeSortChip: {
+        backgroundColor: Colors.primary500,
+        borderColor: Colors.primary600,
+    },
+    sortText: {
+        fontFamily: 'Inter_600SemiBold',
+        fontSize: 11,
+        color: Colors.textSecondary,
+    },
+    activeSortText: {
         color: '#fff',
     },
     resultsRow: {
@@ -302,7 +410,7 @@ const styles = StyleSheet.create({
     ratingText: {
         fontFamily: 'Inter_700Bold',
         fontSize: 10,
-        color: Colors.warning500,
+        color: Colors.warning700,
     },
     clinicFooter: {
         flexDirection: 'row',

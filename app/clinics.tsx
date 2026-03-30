@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
     StyleSheet,
     Text,
@@ -8,81 +8,25 @@ import {
     Image,
     TextInput,
     StatusBar,
+    Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Link, router, Stack } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import Animated, { FadeInDown, Layout as ReanimatedLayout } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Haptics from 'expo-haptics';
 import Colors from '@/constants/colors';
 import { GlassView } from '@/components/ui/GlassView';
 import { StatusBadge } from '@/components/ui/StatusBadge';
+import { clinics, getClinicDoctor } from '@/lib/data';
 
-// Extended Data for All Clinics
-const ALL_CLINICS = [
-    {
-        id: '1',
-        name: 'Jay Dental Clinic',
-        doctor: 'Dr. John Doe',
-        specialty: 'Dentist',
-        rating: 4.8,
-        distance: '1.2 km',
-        waitTimeMin: 10,
-        services: ['dental', 'general'],
-        image: 'https://images.unsplash.com/photo-1629909613654-28e377c37b09?w=800&auto=format&fit=crop&q=60',
-        tags: ['Open Now'],
-    },
-    {
-        id: '2',
-        name: 'City Health Center',
-        doctor: 'Dr. Sarah Smith',
-        specialty: 'General',
-        rating: 4.5,
-        distance: '2.5 km',
-        waitTimeMin: 45,
-        services: ['general'],
-        image: 'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?w=800&auto=format&fit=crop&q=60',
-        tags: ['Open Now'],
-    },
-    {
-        id: '3',
-        name: 'Life Care Polyclinic',
-        doctor: 'Dr. Michael Brown',
-        specialty: 'Skin',
-        rating: 4.2,
-        distance: '3.8 km',
-        waitTimeMin: 75,
-        services: ['dermatology', 'general'],
-        image: 'https://images.unsplash.com/photo-1538108149393-fbbd81895907?w=800&auto=format&fit=crop&q=60',
-        tags: ['Closed Soon'],
-    },
-    {
-        id: '4',
-        name: 'Sunrise Heart Clinic',
-        doctor: 'Dr. Emily Chen',
-        specialty: 'Cardio',
-        rating: 4.9,
-        distance: '5.0 km',
-        waitTimeMin: 20,
-        services: ['cardiology', 'general'],
-        image: 'https://images.unsplash.com/photo-1666214280557-f1b5022eb634?w=800&auto=format&fit=crop&q=60',
-        tags: ['Open Now'],
-    },
-    {
-        id: '5',
-        name: 'Kids Care Pediatric',
-        doctor: 'Dr. David Wilson',
-        specialty: 'Pediatrician',
-        rating: 4.7,
-        distance: '4.2 km',
-        waitTimeMin: 5,
-        services: ['pediatrics', 'general'],
-        image: 'https://images.unsplash.com/photo-1631217868264-e5b90bb7e133?w=800&auto=format&fit=crop&q=60',
-        tags: ['Open Now'],
-    },
+const FILTERS = ['All', 'General', 'Dental', 'Skin', 'Cardio', 'Pediatric', 'Lab Tests', 'Open Now', 'Wait < 30m'];
+const SORT_OPTIONS = [
+    { id: 'distance', label: 'Nearest', icon: 'location' },
+    { id: 'wait', label: 'Shortest Queue', icon: 'time' },
+    { id: 'rating', label: 'Top Rated', icon: 'star' },
 ];
-
-const FILTERS = ['All', 'General', 'Dental', 'Skin', 'Cardio', 'Pediatric', 'Lab Tests', 'Orthopedic', 'Open Now', 'Wait < 30m'];
 
 const getStatus = (mins: number) => {
     if (mins < 15) return 'success';
@@ -100,30 +44,54 @@ export default function ClinicsScreen() {
     const insets = useSafeAreaInsets();
     const [searchQuery, setSearchQuery] = useState('');
     const [activeFilter, setActiveFilter] = useState('All');
+    const [sortBy, setSortBy] = useState('distance');
 
-    // Filter Logic
-    const filteredClinics = ALL_CLINICS.filter((clinic) => {
-        const matchesSearch = clinic.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            clinic.doctor.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            clinic.specialty.toLowerCase().includes(searchQuery.toLowerCase());
+    // Filter & Sort Logic
+    const processedClinics = useMemo(() => {
+        let result = clinics.filter((clinic) => {
+            const docName = getClinicDoctor(clinic.id)?.name || '';
+            const matchesSearch = clinic.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                docName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                clinic.type.toLowerCase().includes(searchQuery.toLowerCase());
 
-        if (!matchesSearch) return false;
+            if (!matchesSearch) return false;
 
-        // Service-based filters
-        if (activeFilter === 'General') return clinic.services.includes('general');
-        if (activeFilter === 'Dental') return clinic.services.includes('dental');
-        if (activeFilter === 'Skin') return clinic.services.includes('dermatology');
-        if (activeFilter === 'Cardio') return clinic.services.includes('cardiology');
-        if (activeFilter === 'Pediatric') return clinic.services.includes('pediatrics');
-        if (activeFilter === 'Lab Tests') return clinic.services.includes('lab');
-        if (activeFilter === 'Orthopedic') return clinic.services.includes('orthopedics');
+            // Service-based filters
+            if (activeFilter === 'General') return clinic.type.includes('general');
+            if (activeFilter === 'Dental') return clinic.type.includes('dental');
+            if (activeFilter === 'Skin') return clinic.type.includes('dermatology') || clinic.type.includes('skin');
+            if (activeFilter === 'Cardio') return clinic.type.includes('cardio');
+            if (activeFilter === 'Pediatric') return clinic.type.includes('pediatric');
+            if (activeFilter === 'Lab Tests') return clinic.type.includes('lab');
 
-        // Tag-based filters
-        if (activeFilter === 'Open Now') return clinic.tags.includes('Open Now');
-        if (activeFilter === 'Wait < 30m') return clinic.waitTimeMin < 30;
+            // Tag/State based filters
+            if (activeFilter === 'Open Now') return clinic.state === 'live' || clinic.state === 'booking_open';
+            
+            const waitTime = clinic.currentQueueLength * clinic.avgWaitTimePerPatient;
+            if (activeFilter === 'Wait < 30m') return waitTime < 30;
 
-        return true; // 'All' filter
-    });
+            return true; // 'All' filter
+        });
+
+        // Sorting
+        result.sort((a, b) => {
+            if (sortBy === 'distance') return a.distance - b.distance;
+            if (sortBy === 'wait') {
+                const waitA = a.currentQueueLength * a.avgWaitTimePerPatient;
+                const waitB = b.currentQueueLength * b.avgWaitTimePerPatient;
+                return waitA - waitB;
+            }
+            if (sortBy === 'rating') return b.rating - a.rating;
+            return 0;
+        });
+
+        return result;
+    }, [searchQuery, activeFilter, sortBy]);
+
+    const handleSortChange = (id: string) => {
+        if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        setSortBy(id);
+    };
 
     return (
         <View style={styles.container}>
@@ -131,7 +99,7 @@ export default function ClinicsScreen() {
             <StatusBar barStyle="dark-content" />
 
             {/* Header Background */}
-            <View style={[styles.headerBg, { height: 180 + insets.top }]}>
+            <View style={[styles.headerBg, { height: 210 + insets.top }]}>
                 <LinearGradient
                     colors={['#E0F7F6', '#F8FAFC']}
                     style={StyleSheet.absoluteFill}
@@ -145,9 +113,7 @@ export default function ClinicsScreen() {
                         <Ionicons name="arrow-back" size={24} color={Colors.text} />
                     </Pressable>
                     <Text style={styles.headerTitle}>Find Care</Text>
-                    <Pressable style={styles.filterToggleBtn}>
-                        <Ionicons name="options-outline" size={22} color={Colors.primary} />
-                    </Pressable>
+                    <View style={{ width: 40 }} />
                 </View>
 
                 {/* Search Input */}
@@ -167,12 +133,12 @@ export default function ClinicsScreen() {
                     )}
                 </GlassView>
 
-                {/* Filters */}
+                {/* Categories */}
                 <ScrollView
                     horizontal
                     showsHorizontalScrollIndicator={false}
                     contentContainerStyle={styles.filterScroll}
-                    style={{ maxHeight: 50, marginBottom: 10 }}
+                    style={{ maxHeight: 44, marginBottom: 12 }}
                 >
                     {FILTERS.map((filter) => (
                         <Pressable
@@ -194,51 +160,73 @@ export default function ClinicsScreen() {
                         </Pressable>
                     ))}
                 </ScrollView>
+
+                {/* Sort Bar */}
+                <View style={styles.sortContainer}>
+                    <Text style={styles.sortLabel}>Sort:</Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sortScroll}>
+                        {SORT_OPTIONS.map((opt) => (
+                            <Pressable 
+                                key={opt.id} 
+                                style={[styles.sortChip, sortBy === opt.id && styles.activeSortChip]}
+                                onPress={() => handleSortChange(opt.id)}
+                            >
+                                <Ionicons name={opt.icon as any} size={11} color={sortBy === opt.id ? '#fff' : Colors.textSecondary} />
+                                <Text style={[styles.sortText, sortBy === opt.id && styles.activeSortText]}>{opt.label}</Text>
+                            </Pressable>
+                        ))}
+                    </ScrollView>
+                </View>
             </View>
 
             {/* Clinic List */}
             <ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
-                {filteredClinics.length > 0 ? (
-                    filteredClinics.map((clinic, index) => (
-                        <Animated.View
-                            key={clinic.id}
-                            entering={FadeInDown.duration(500).delay(index * 100)}
-                        >
-                            <Link href={`/clinic/${clinic.id}`} asChild>
-                                <Pressable>
-                                    <GlassView style={styles.clinicCard} border intensity={80}>
-                                        <Image source={{ uri: clinic.image }} style={styles.clinicImage} />
+                {processedClinics.length > 0 ? (
+                    processedClinics.map((clinic, index) => {
+                        const waitTime = clinic.currentQueueLength * clinic.avgWaitTimePerPatient;
+                        const docName = getClinicDoctor(clinic.id)?.name || 'Unknown Doctor';
+                        return (
+                            <Animated.View
+                                key={clinic.id}
+                                layout={ReanimatedLayout.springify()}
+                                entering={FadeInDown.duration(500).delay((index % 5) * 80)}
+                            >
+                                <Link href={`/clinic/${clinic.id}`} asChild>
+                                    <Pressable>
+                                        <GlassView style={styles.clinicCard} border intensity={80}>
+                                            <Image source={{ uri: clinic.image }} style={styles.clinicImage} />
 
-                                        <View style={styles.clinicContent}>
-                                            <View style={styles.rowBetween}>
-                                                <View style={{ flex: 1 }}>
-                                                    <Text style={styles.clinicName}>{clinic.name}</Text>
-                                                    <Text style={styles.doctorName}>{clinic.doctor}</Text>
+                                            <View style={styles.clinicContent}>
+                                                <View style={styles.rowBetween}>
+                                                    <View style={{ flex: 1 }}>
+                                                        <Text style={styles.clinicName}>{clinic.name}</Text>
+                                                        <Text style={styles.doctorName}>{docName}</Text>
+                                                    </View>
+                                                    <View style={styles.ratingBadge}>
+                                                        <Ionicons name="star" size={10} color="#F59E0B" />
+                                                        <Text style={styles.ratingText}>{clinic.rating}</Text>
+                                                    </View>
                                                 </View>
-                                                <View style={styles.ratingBadge}>
-                                                    <Ionicons name="star" size={10} color="#F59E0B" />
-                                                    <Text style={styles.ratingText}>{clinic.rating}</Text>
+
+                                                <View style={styles.clinicFooter}>
+                                                    <View style={styles.infoRow}>
+                                                        <Text style={[styles.detailText, {textTransform: 'capitalize'}]}>{clinic.type}</Text>
+                                                        <View style={styles.dot} />
+                                                        <Text style={styles.detailText}>{clinic.distance} km</Text>
+                                                    </View>
+
+                                                    <StatusBadge
+                                                        status={getStatus(waitTime) as any}
+                                                        text={getWaitLabel(waitTime)}
+                                                    />
                                                 </View>
                                             </View>
-
-                                            <View style={styles.clinicFooter}>
-                                                <View style={styles.infoRow}>
-                                                    <Text style={styles.detailText}>{clinic.specialty}</Text>
-                                                    <View style={styles.dot} />
-                                                    <Text style={styles.detailText}>{clinic.distance}</Text>
-                                                </View>
-
-                                                <StatusBadge
-                                                    status={getStatus(clinic.waitTimeMin) as any}
-                                                    text={getWaitLabel(clinic.waitTimeMin)}
-                                                />
-                                            </View>
-                                        </View>
-                                    </GlassView>
-                                </Pressable>
-                            </Link>
-                        </Animated.View>
-                    ))
+                                        </GlassView>
+                                    </Pressable>
+                                </Link>
+                            </Animated.View>
+                        );
+                    })
                 ) : (
                     <View style={styles.emptyState}>
                         <Ionicons name="search-outline" size={48} color={Colors.textMuted} />
@@ -261,8 +249,8 @@ const styles = StyleSheet.create({
         left: 0,
         right: 0,
         backgroundColor: '#fff',
-        borderBottomLeftRadius: 30,
-        borderBottomRightRadius: 30,
+        borderBottomLeftRadius: 32,
+        borderBottomRightRadius: 32,
         overflow: 'hidden',
         ...Colors.shadows.sm,
     },
@@ -290,12 +278,6 @@ const styles = StyleSheet.create({
         fontFamily: 'Inter_700Bold',
         fontSize: 18,
         color: Colors.text,
-    },
-    filterToggleBtn: {
-        width: 40,
-        height: 40,
-        alignItems: 'center',
-        justifyContent: 'center',
     },
     searchBar: {
         flexDirection: 'row',
@@ -335,6 +317,46 @@ const styles = StyleSheet.create({
         color: Colors.textSecondary,
     },
     activeFilterText: {
+        color: '#fff',
+    },
+    sortContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        marginBottom: 8,
+    },
+    sortLabel: {
+        fontFamily: 'Inter_700Bold',
+        fontSize: 11,
+        color: Colors.textTertiary,
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+    },
+    sortScroll: {
+        gap: 8,
+        paddingRight: 20,
+    },
+    sortChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 20,
+        backgroundColor: Colors.gray100,
+        borderWidth: 1,
+        borderColor: 'transparent',
+    },
+    activeSortChip: {
+        backgroundColor: Colors.primary500,
+        borderColor: Colors.primary600,
+    },
+    sortText: {
+        fontFamily: 'Inter_600SemiBold',
+        fontSize: 11,
+        color: Colors.textSecondary,
+    },
+    activeSortText: {
         color: '#fff',
     },
     listContent: {

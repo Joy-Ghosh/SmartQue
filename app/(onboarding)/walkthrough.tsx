@@ -1,465 +1,410 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, Pressable, Dimensions, Alert, Linking } from 'react-native';
+import { StyleSheet, View, Text, Pressable, Dimensions, StatusBar, Platform, Switch } from 'react-native';
 import { useRouter } from 'expo-router';
 import Animated, {
     useSharedValue,
     useAnimatedStyle,
     withRepeat,
     withTiming,
-    SlideInRight,
-    SlideOutLeft,
+    withSpring,
+    withDelay,
     FadeIn,
-    FadeOut
+    FadeOut,
+    FadeInDown,
+    SlideInRight,
 } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import Colors from '@/constants/colors';
-import { GlassView } from '@/components/ui/GlassView';
-import { GradientButton } from '@/components/ui/GradientButton';
+import * as Haptics from 'expo-haptics';
 
-const { width } = Dimensions.get('window');
+const { width: WINDOW_WIDTH } = Dimensions.get('window');
 
-const LANGUAGES = [
-    { id: 'en', label: 'English' },
-    { id: 'es', label: 'Español' },
-    { id: 'hi', label: 'हिन्दी' },
-    { id: 'fr', label: 'Français' },
-];
+// 🎯 GLOBAL DESIGN SYSTEM 
+const DESIGN = {
+    colors: {
+        primary: '#2F6B8A',
+        primaryDark: '#1F4E68',
+        success: '#4CAF50',
+        error: '#E53935',
+        background: '#F7F9FB',
+        card: '#FFFFFF',
+        textPrimary: '#0F172A',
+        textSecondary: '#64748B',
+        border: '#E2E8F0',
+    },
+    spacing: {
+        screenPadding: 24,
+        sectionGap: 32,
+        elementGap: 16,
+        itemGap: 12,
+    },
+    radius: {
+        button: 16,
+        card: 20,
+        pill: 99,
+    },
+    typography: {
+        heading: { fontSize: 28, fontWeight: '600' as const, letterSpacing: -0.5, color: '#0F172A' },
+        subtext: { fontSize: 16, fontWeight: '400' as const, lineHeight: 24, color: '#64748B' },
+        cta: { fontSize: 16, fontWeight: '500' as const },
+        label: { fontSize: 14, fontWeight: '600' as const },
+    }
+} as const;
+
+// ── SUB-COMPONENTS ─────────────────────────────────────────────────────────────
+
+function ProgressBar({ step, total }: { step: number; total: number }) {
+    return (
+        <View style={styles.progressContainer}>
+            {Array.from({ length: total }).map((_, i) => (
+                <View key={i} style={styles.progressTrack}>
+                    <View style={[styles.progressFill, { width: i <= step ? '100%' : '0%', opacity: i === step ? 1 : 0.3 }]} />
+                </View>
+            ))}
+        </View>
+    );
+}
+
+function PrimaryButton({ title, onPress, variant = 'primary', style, icon }: any) {
+    return (
+        <Pressable 
+            onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                onPress();
+            }}
+            style={({ pressed }) => [
+                styles.btnBase,
+                variant === 'primary' ? styles.btnPrimary : styles.btnSecondary,
+                pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] },
+                style
+            ]}
+        >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Text style={[styles.btnText, variant === 'secondary' && { color: DESIGN.colors.primary }]}>{title}</Text>
+                {icon && <Ionicons name={icon} size={20} color={variant === 'primary' ? '#FFF' : DESIGN.colors.primary} />}
+            </View>
+        </Pressable>
+    );
+}
+
+// ── ADVANCED MERGED ILLUSTRATIONS ──────────────────────────────────────────────
+
+function IllustrationHook() {
+    // Shared values for multi-element motion
+    const mapPulse = useSharedValue(1);
+    const timelineProgress = useSharedValue(0);
+    const queueOpacity = useSharedValue(1);
+
+    useEffect(() => {
+        mapPulse.value = withRepeat(withSpring(1.15), -1, true);
+        timelineProgress.value = withRepeat(withTiming(1, { duration: 3000 }), -1, true);
+        queueOpacity.value = withRepeat(withTiming(0.2, { duration: 1500 }), -1, true);
+    }, []);
+
+    const pulseStyle = useAnimatedStyle(() => ({ transform: [{ scale: mapPulse.value }] }));
+    const dotStyle = useAnimatedStyle(() => ({ left: `${timelineProgress.value * 70}%` }));
+    const queueStyle = useAnimatedStyle(() => ({ opacity: queueOpacity.value }));
+
+    return (
+        <View style={styles.illuContainer}>
+            {/* Merged View: Map + Timeline + Empty Queue */}
+            <View style={styles.hookWrapper}>
+                {/* 1. Map Component */}
+                <View style={styles.miniMap}>
+                    <Animated.View style={[styles.pinBadge, { backgroundColor: '#E8F5E9' }, pulseStyle]}>
+                        <Text style={[styles.pinText, { color: '#2E7D32' }]}>0 min wait</Text>
+                    </Animated.View>
+                </View>
+
+                {/* 2. Timeline Component */}
+                <View style={[styles.timeline, { marginTop: 24 }]}>
+                    <View style={styles.timelineTrack} />
+                    <Animated.View style={[styles.timelineDot, dotStyle]} />
+                    <Text style={styles.timelineLabel}>Leave in 12m</Text>
+                </View>
+
+                {/* 3. Empty Queue Representation */}
+                <Animated.View style={[styles.emptyQueue, queueStyle]}>
+                    <Ionicons name="people-outline" size={32} color={DESIGN.colors.border} />
+                    <View style={styles.slashLine} />
+                </Animated.View>
+            </View>
+            <View style={styles.illuGlow} />
+        </View>
+    );
+}
+
+function IllustrationConfidence() {
+    return (
+        <View style={styles.illuContainer}>
+            <Animated.View entering={FadeInDown.delay(200)} style={styles.doctorCard}>
+                <View style={styles.docAvatar} />
+                <View style={{ flex: 1 }}>
+                    <Text style={styles.docName}>Dr. Sarah Kim</Text>
+                    <Text style={styles.docSub}>Cardiologist • 12 yrs exp</Text>
+                    <View style={styles.ratingRow}>
+                        <Ionicons name="star" size={14} color="#FFD700" />
+                        <Text style={styles.ratingText}>4.8 (320 reviews)</Text>
+                    </View>
+                </View>
+                <View style={styles.bestMatchBadge}>
+                    <Text style={styles.bestMatchText}>Best Match</Text>
+                </View>
+            </Animated.View>
+            {/* Secondary card peek */}
+            <View style={[styles.doctorCard, styles.docCardPeek]} />
+        </View>
+    );
+}
+
+// ── MAIN SCREEN ───────────────────────────────────────────────────────────────
 
 export default function WalkthroughScreen() {
     const router = useRouter();
-    const [step, setStep] = useState(1);
-    const [selectedLang, setSelectedLang] = useState<string | null>(null);
+    const insets = useSafeAreaInsets();
+    const [step, setStep] = useState(0); // 0: Hook, 1: Confidence, 2: Setup, 3: Entry
+    const [selectedLang, setSelectedLang] = useState('English');
+    const [perms, setPerms] = useState({ location: false, alerts: false });
 
     const nextStep = () => {
-        if (step < 5) {
+        if (step < 3) {
             setStep(s => s + 1);
+        } else {
+            router.replace('/(tabs)');
         }
     };
 
-    const handleLanguageSelect = (langId: string) => {
-        setSelectedLang(langId);
-        setTimeout(() => {
-            nextStep();
-        }, 400);
-    };
-
-    const handleFinishNormal = () => {
-        router.replace('/(tabs)');
-    };
-
-    const handleFinishEmergency = () => {
-        Alert.alert(
-            "Emergency Care",
-            "Are you experiencing a life-threatening medical emergency?",
-            [
-                { text: "Cancel", style: "cancel" },
-                {
-                    text: "Call 911", style: "destructive", onPress: () => {
-                        Linking.openURL('tel:911');
-                    }
-                }
-            ]
-        );
-    };
-
-    // Pulse animation for Radar step
-    const pulseScale = useSharedValue(1);
-    const pulseOpacity = useSharedValue(0.8);
-
-    useEffect(() => {
-        if (step === 3) {
-            pulseScale.value = withRepeat(withTiming(1.6, { duration: 1500 }), -1, false);
-            pulseOpacity.value = withRepeat(withTiming(0, { duration: 1500 }), -1, false);
+    const prevStep = () => {
+        if (step > 0) {
+            setStep(s => s - 1);
         }
-    }, [step]);
+    };
 
-    const animatedPulse = useAnimatedStyle(() => ({
-        transform: [{ scale: pulseScale.value }],
-        opacity: pulseOpacity.value,
-    }));
-
-    const renderStep = () => {
+    const renderContent = () => {
         switch (step) {
-            case 1:
+            case 0: // HOOK (Combined Skip + Real-time + Timing)
                 return (
-                    <Animated.View key="step1" entering={FadeIn.duration(400)} exiting={SlideOutLeft} style={styles.content}>
-                        <View style={styles.iconContainer}>
-                            <Ionicons name="hand-right-outline" size={80} color={Colors.primary500} />
+                    <Animated.View key="hook" entering={FadeIn} exiting={FadeOut} style={styles.stepContent}>
+                        <IllustrationHook />
+                        <View style={styles.textStack}>
+                            <Text style={styles.heading}>Skip the waiting room.</Text>
+                            <Text style={styles.subtext}>See live wait times and leave at the perfect moment. No more uncertainty.</Text>
                         </View>
-                        <Text style={styles.title}>Health speaks your language.</Text>
-                        <Text style={styles.subtitle}>Choose your preferred language to continue.</Text>
+                        <PrimaryButton title="Get Started" onPress={nextStep} style={styles.cta} />
+                    </Animated.View>
+                );
 
-                        <View style={styles.optionsContainer}>
-                            {LANGUAGES.map(lang => (
-                                <Pressable
-                                    key={lang.id}
-                                    style={[
-                                        styles.langButton,
-                                        selectedLang === lang.id && styles.langButtonActive
-                                    ]}
-                                    onPress={() => handleLanguageSelect(lang.id)}
-                                >
-                                    <Text style={[
-                                        styles.langButtonText,
-                                        selectedLang === lang.id && styles.langButtonTextActive
-                                    ]}>{lang.label}</Text>
-                                    {selectedLang === lang.id && (
-                                        <Ionicons name="checkmark-circle" size={20} color="#fff" />
-                                    )}
-                                </Pressable>
-                            ))}
+            case 1: // CONFIDENCE (Doctor Trust)
+                return (
+                    <Animated.View key="confidence" entering={SlideInRight} style={styles.stepContent}>
+                        <IllustrationConfidence />
+                        <View style={styles.textStack}>
+                            <Text style={styles.heading}>Choose with confidence.</Text>
+                            <Text style={styles.subtext}>Compare doctors, reviews, and availability instantly. Trust your care plan.</Text>
                         </View>
+                        <PrimaryButton title="Continue" onPress={nextStep} style={styles.cta} />
                     </Animated.View>
                 );
-            case 2:
-                return (
-                    <Animated.View key="step2" entering={SlideInRight} exiting={SlideOutLeft} style={styles.content}>
-                        <View style={styles.illustrationWrap}>
-                            <View style={styles.iconCircle}>
-                                <Ionicons name="home-outline" size={40} color={Colors.primary500} />
-                            </View>
-                            <View style={styles.dashedLine} />
-                            <View style={[styles.iconCircle, { backgroundColor: Colors.primary200 }]}>
-                                <Ionicons name="medical-outline" size={40} color={Colors.primary700} />
-                            </View>
-                        </View>
-                        <View style={{ flex: 1, justifyContent: 'center', paddingBottom: 60 }}>
-                            <Text style={styles.title}>Skip the waiting room.</Text>
-                            <Text style={styles.subtitle}>Book your spot before you even leave the house.</Text>
-                        </View>
-                        <GradientButton title="Next" onPress={nextStep} style={{ width: '100%' }} />
-                    </Animated.View>
-                );
-            case 3:
-                return (
-                    <Animated.View key="step3" entering={SlideInRight} exiting={SlideOutLeft} style={styles.content}>
-                        <View style={styles.illustrationWrapCenter}>
-                            <Ionicons name="map-outline" size={100} color={Colors.textMuted} />
-                            <View style={styles.dotContainer}>
-                                <Animated.View style={[styles.pulseCircle, animatedPulse]} />
-                                <View style={styles.centerDot} />
-                            </View>
-                        </View>
-                        <View style={{ flex: 1, justifyContent: 'center', paddingBottom: 60 }}>
-                            <Text style={styles.title}>Find the shortest lines near you.</Text>
-                            <Text style={styles.subtitle}>We need your location to show live queue times at nearby clinics and guide you there.</Text>
-                        </View>
-                        <View style={styles.actionContainer}>
-                            <GradientButton title="Enable Location" onPress={nextStep} style={{ width: '100%' }} />
-                            <Pressable onPress={nextStep} style={styles.textLink}>
-                                <Text style={styles.textLinkText}>Maybe later</Text>
-                            </Pressable>
-                        </View>
-                    </Animated.View>
-                );
-            case 4:
-                return (
-                    <Animated.View key="step4" entering={SlideInRight} exiting={SlideOutLeft} style={styles.content}>
-                        <View style={styles.illustrationWrapCenter}>
-                            <Ionicons name="phone-portrait-outline" size={120} color={Colors.textSecondary} />
-                            <View style={styles.notificationBadge}>
-                                <Text style={styles.badgeText}>0 min wait</Text>
-                            </View>
-                        </View>
-                        <View style={{ flex: 1, justifyContent: 'center', paddingBottom: 60 }}>
-                            <Text style={styles.title}>Never wait in the lobby again.</Text>
-                            <Text style={styles.subtitle}>Allow alerts so we can tell you the exact minute you need to leave your house.</Text>
-                        </View>
-                        <View style={styles.actionContainer}>
-                            <GradientButton title="Allow Live Alerts" onPress={nextStep} style={{ width: '100%' }} />
-                            <Pressable onPress={nextStep} style={styles.textLink}>
-                                <Text style={styles.textLinkText}>Skip for now</Text>
-                            </Pressable>
-                        </View>
-                    </Animated.View>
-                );
-            case 5:
-                return (
-                    <Animated.View key="step5" entering={SlideInRight} exiting={FadeOut} style={styles.content}>
-                        <View style={{ flex: 1, justifyContent: 'center' }}>
-                            <View style={styles.iconContainerCenter}>
-                                <Ionicons name="pulse" size={60} color={Colors.primary500} />
-                            </View>
-                            <Text style={[styles.title, { textAlign: 'center' }]}>How can we help you right now?</Text>
-                            <Text style={[styles.subtitle, { textAlign: 'center', marginBottom: 40 }]}>
-                                Let us get you the care you need immediately.
-                            </Text>
 
-                            <Pressable
-                                style={({ pressed }) => [
-                                    styles.triageCard,
-                                    styles.triageCardPrimary,
-                                    pressed && { transform: [{ scale: 0.98 }] }
-                                ]}
-                                onPress={handleFinishNormal}
+            case 2: // SETUP (Combined Language + Permissions)
+                return (
+                    <Animated.View key="setup" entering={SlideInRight} style={styles.stepContent}>
+                        <View style={[styles.textStack, { marginBottom: 32 }]}>
+                            <Text style={styles.heading}>Personalize your experience.</Text>
+                            <Text style={styles.subtext}>Set your preferences to get the most accurate queue updates.</Text>
+                        </View>
+
+                        <View style={styles.setupContainer}>
+                            {/* Language Selector Selector */}
+                            <View style={styles.setupGroup}>
+                                <Text style={styles.groupLabel}>Language</Text>
+                                <View style={styles.langGrid}>
+                                    {['English', 'Español', 'हिंदी'].map(l => (
+                                        <Pressable 
+                                            key={l} 
+                                            style={[styles.langChip, selectedLang === l && styles.langChipActive]}
+                                            onPress={() => setSelectedLang(l)}
+                                        >
+                                            <Text style={[styles.langChipText, selectedLang === l && { color: '#FFF' }]}>{l}</Text>
+                                        </Pressable>
+                                    ))}
+                                </View>
+                            </View>
+
+                            {/* Permissions Stack */}
+                            <View style={styles.setupGroup}>
+                                <Text style={styles.groupLabel}>Preferences</Text>
+                                <View style={styles.permItem}>
+                                    <View style={styles.permIcon}><Ionicons name="location" size={20} color={DESIGN.colors.primary} /></View>
+                                    <View style={{ flex: 1 }}><Text style={styles.permTitle}>Nearness Detection</Text><Text style={styles.permSub}>To show clinics near you</Text></View>
+                                    <Switch 
+                                        value={perms.location} 
+                                        onValueChange={v => setPerms(p => ({ ...p, location: v }))}
+                                        trackColor={{ true: DESIGN.colors.primary }}
+                                    />
+                                </View>
+                                <View style={styles.permItem}>
+                                    <View style={styles.permIcon}><Ionicons name="notifications" size={20} color={DESIGN.colors.primary} /></View>
+                                    <View style={{ flex: 1 }}><Text style={styles.permTitle}>Leave Reminders</Text><Text style={styles.permSub}>Get notified when to go</Text></View>
+                                    <Switch 
+                                        value={perms.alerts} 
+                                        onValueChange={v => setPerms(p => ({ ...p, alerts: v }))}
+                                        trackColor={{ true: DESIGN.colors.primary }}
+                                    />
+                                </View>
+                            </View>
+                        </View>
+
+                        <PrimaryButton title="Let's Go" onPress={nextStep} style={styles.cta} icon="arrow-forward" />
+                    </Animated.View>
+                );
+
+            case 3: // ENTRY (Decision Screen)
+                return (
+                    <Animated.View key="entry" entering={FadeInDown} style={styles.stepContent}>
+                        <View style={[styles.textStack, { marginBottom: 40 }]}>
+                            <Text style={styles.heading}>What do you need right now?</Text>
+                            <Text style={styles.subtext}>Let us guide you instantly based on your urgency.</Text>
+                        </View>
+                        
+                        <View style={styles.decisionStack}>
+                            <Pressable 
+                                style={({ pressed }) => [styles.decisionCard, styles.decisionPrimary, pressed && { opacity: 0.9, transform: [{scale: 0.98}] }]} 
+                                onPress={() => router.replace('/(tabs)')}
                             >
-                                <View style={[styles.triageIconWrap, { backgroundColor: '#fff' }]}>
-                                    <Ionicons name="calendar-outline" size={28} color={Colors.primary500} />
-                                </View>
-                                <View style={styles.triageTextWrap}>
-                                    <Text style={[styles.triageTitle, { color: '#fff' }]}>Schedule a Visit</Text>
-                                    <Text style={[styles.triageSub, { color: 'rgba(255,255,255,0.8)' }]}>Standard booking flow</Text>
-                                </View>
-                                <Ionicons name="arrow-forward" size={24} color="#fff" />
+                                <View style={styles.decisionIcon}><Ionicons name="calendar-outline" size={24} color="#FFF" /></View>
+                                <View style={{ flex: 1 }}><Text style={styles.decisionTitle}>Schedule a Visit</Text><Text style={styles.decisionSub}>Choose a time that works for you</Text></View>
+                                <Ionicons name="chevron-forward" size={24} color="#FFF" />
                             </Pressable>
 
-                            <Pressable
-                                style={({ pressed }) => [
-                                    styles.triageCard,
-                                    styles.triageCardDanger,
-                                    pressed && { transform: [{ scale: 0.98 }] }
-                                ]}
-                                onPress={handleFinishEmergency}
+                            <Pressable 
+                                style={({ pressed }) => [styles.decisionCard, styles.decisionEmergency, pressed && { opacity: 0.9, transform: [{scale: 0.98}] }]} 
+                                onPress={() => router.push('/emergency')}
                             >
-                                <View style={[styles.triageIconWrap, { backgroundColor: 'rgba(239,68,68,0.15)' }]}>
-                                    <Ionicons name="medical" size={28} color={Colors.error500} />
-                                </View>
-                                <View style={styles.triageTextWrap}>
-                                    <Text style={[styles.triageTitle, { color: Colors.error500 }]}>Emergency Care</Text>
-                                    <Text style={[styles.triageSub, { color: Colors.textSecondary }]}>Immediate ER routing</Text>
-                                </View>
-                                <Ionicons name="warning-outline" size={24} color={Colors.error500} />
+                                <View style={[styles.decisionIcon, { backgroundColor: '#FFEDEB' }]}><Ionicons name="flash" size={24} color={DESIGN.colors.error} /></View>
+                                <View style={{ flex: 1 }}><Text style={[styles.decisionTitle, { color: DESIGN.colors.error }]}>Emergency Care</Text><Text style={styles.decisionSub}>Immediate assistance needed</Text></View>
+                                <Ionicons name="chevron-forward" size={24} color={DESIGN.colors.error} />
                             </Pressable>
                         </View>
                     </Animated.View>
                 );
-            default:
-                return null;
+
+            default: return null;
         }
     };
 
     return (
         <View style={styles.container}>
-            <LinearGradient
-                colors={['#fff', '#F8FAFC']}
-                style={StyleSheet.absoluteFill}
-            />
-            {/* Soft geometric blobs */}
-            <View style={[styles.blob, { top: -100, right: -50, backgroundColor: Colors.primary100 }]} />
-            <View style={[styles.blob, { bottom: -100, left: -50, backgroundColor: Colors.primary100 }]} />
-
-            <View style={styles.inner}>
-                {/* Minimalist Progress Indicator */}
-                <View style={styles.progressHeader}>
-                    {[1, 2, 3, 4, 5].map(i => (
-                        <View
-                            key={i}
-                            style={[
-                                styles.progressSeg,
-                                i === step && styles.progressSegActive,
-                                i < step && styles.progressSegDone
-                            ]}
-                        />
-                    ))}
+            <StatusBar barStyle="dark-content" />
+            <LinearGradient colors={['#F7F9FB', '#FFFFFF']} style={StyleSheet.absoluteFill} />
+            
+            <View style={[styles.header, { paddingTop: insets.top + 20, flexDirection: 'row', alignItems: 'center', gap: 16 }]}>
+                {step > 0 ? (
+                    <Pressable 
+                        onPress={prevStep}
+                        hitSlop={8}
+                        style={({ pressed }) => [
+                            styles.backButton,
+                            pressed && { opacity: 0.7, transform: [{ scale: 0.95 }] }
+                        ]}
+                    >
+                        <Ionicons name="chevron-back" size={24} color={DESIGN.colors.textPrimary} />
+                    </Pressable>
+                ) : (
+                    <View style={{ width: 44 }} />
+                )}
+                <View style={{ flex: 1 }}>
+                    <ProgressBar step={step} total={4} />
                 </View>
+                <View style={{ width: 44 }} /> 
+            </View>
 
-                {renderStep()}
+            <View style={styles.main}>
+                {renderContent()}
             </View>
         </View>
     );
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#fff',
-    },
-    blob: {
-        position: 'absolute',
-        width: 300,
-        height: 300,
-        borderRadius: 150,
-    },
-    inner: {
-        flex: 1,
-        paddingTop: 60,
-        paddingHorizontal: 32,
-        paddingBottom: 40,
-    },
-    progressHeader: {
-        flexDirection: 'row',
-        gap: 6,
-        marginBottom: 40,
+    container: { flex: 1, backgroundColor: DESIGN.colors.background },
+    header: { paddingHorizontal: 24, marginBottom: 40 },
+    progressContainer: { flexDirection: 'row', gap: 10 },
+    progressTrack: { flex: 1, height: 4, backgroundColor: DESIGN.colors.border, borderRadius: 2, overflow: 'hidden' },
+    progressFill: { height: '100%', backgroundColor: DESIGN.colors.primaryDark, borderRadius: 2 },
+    
+    backButton: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: '#FFF',
+        alignItems: 'center',
         justifyContent: 'center',
-    },
-    progressSeg: {
-        height: 4,
-        width: 20,
-        backgroundColor: Colors.borderLight,
-        borderRadius: 2,
-    },
-    progressSegActive: {
-        backgroundColor: Colors.primary500,
-        width: 32,
-    },
-    progressSegDone: {
-        backgroundColor: Colors.primary300,
-    },
-    content: {
-        flex: 1,
-    },
-    iconContainer: {
-        marginBottom: 32,
-        marginTop: 40,
-    },
-    iconContainerCenter: {
-        alignItems: 'center',
-        marginBottom: 24,
-    },
-    title: {
-        fontFamily: 'Inter_700Bold',
-        fontSize: 32,
-        color: Colors.text,
-        marginBottom: 16,
-        lineHeight: 40,
-    },
-    subtitle: {
-        fontFamily: 'Inter_400Regular',
-        fontSize: 16,
-        color: Colors.textSecondary,
-        lineHeight: 24,
-    },
-    optionsContainer: {
-        marginTop: 40,
-        gap: 12,
-    },
-    langButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: 18,
-        borderRadius: 16,
         borderWidth: 1,
-        borderColor: Colors.borderLight,
-        backgroundColor: '#fff',
+        borderColor: DESIGN.colors.border,
+        ...Platform.select({
+            ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 5 },
+            android: { elevation: 2 }
+        })
     },
-    langButtonActive: {
-        backgroundColor: Colors.primary500,
-        borderColor: Colors.primary500,
-    },
-    langButtonText: {
-        fontFamily: 'Inter_500Medium',
-        fontSize: 16,
-        color: Colors.text,
-    },
-    langButtonTextActive: {
-        color: '#fff',
-        fontFamily: 'Inter_600SemiBold',
-    },
-    illustrationWrap: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginTop: 40,
-        marginBottom: 40,
-    },
-    iconCircle: {
-        width: 80,
-        height: 80,
-        borderRadius: 40,
-        backgroundColor: Colors.primary100,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    dashedLine: {
-        flex: 1,
-        height: 2,
-        borderWidth: 1,
-        borderColor: Colors.borderLight,
-        borderStyle: 'dashed',
-        marginHorizontal: 12,
-    },
-    illustrationWrapCenter: {
-        alignItems: 'center',
-        justifyContent: 'center',
-        height: 200,
-        marginTop: 20,
-        position: 'relative',
-    },
-    dotContainer: {
-        position: 'absolute',
-        top: 60,
-        right: 80,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    centerDot: {
-        width: 16,
-        height: 16,
-        borderRadius: 8,
-        backgroundColor: Colors.primary500,
-        borderWidth: 3,
-        borderColor: '#fff',
-    },
-    pulseCircle: {
-        position: 'absolute',
-        width: 48,
-        height: 48,
-        borderRadius: 24,
-        backgroundColor: Colors.primary500,
-    },
-    actionContainer: {
-        gap: 16,
-    },
-    textLink: {
-        alignItems: 'center',
-        paddingVertical: 12,
-    },
-    textLinkText: {
-        fontFamily: 'Inter_500Medium',
-        fontSize: 15,
-        color: Colors.textMuted,
-    },
-    notificationBadge: {
-        position: 'absolute',
-        top: 20,
-        right: 40,
-        backgroundColor: Colors.error500,
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-        borderRadius: 20,
-        ...Colors.shadows.md,
-    },
-    badgeText: {
-        fontFamily: 'Inter_700Bold',
-        fontSize: 14,
-        color: '#fff',
-    },
-    triageCard: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        padding: 20,
-        borderRadius: 24,
-        marginBottom: 16,
-        ...Colors.shadows.sm,
-    },
-    triageCardPrimary: {
-        backgroundColor: Colors.primary500,
-    },
-    triageCardDanger: {
-        backgroundColor: '#fff',
-        borderWidth: 1,
-        borderColor: 'rgba(239,68,68,0.2)',
-    },
-    triageIconWrap: {
-        width: 48,
-        height: 48,
-        borderRadius: 24,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginRight: 16,
-    },
-    triageTextWrap: {
-        flex: 1,
-    },
-    triageTitle: {
-        fontFamily: 'Inter_700Bold',
-        fontSize: 18,
-        marginBottom: 4,
-    },
-    triageSub: {
-        fontFamily: 'Inter_400Regular',
-        fontSize: 14,
-    },
+    
+    main: { flex: 1, paddingHorizontal: DESIGN.spacing.screenPadding },
+    stepContent: { flex: 1 },
+    textStack: { gap: 8 },
+    heading: { ...DESIGN.typography.heading },
+    subtext: { ...DESIGN.typography.subtext },
+    cta: { marginTop: 'auto', marginBottom: 40 },
+
+    btnBase: { height: 56, borderRadius: DESIGN.radius.button, alignItems: 'center', justifyContent: 'center' },
+    btnPrimary: { backgroundColor: DESIGN.colors.primary },
+    btnText: { color: '#FFF', fontSize: 16, fontWeight: '600' },
+    btnSecondary: { backgroundColor: 'transparent' },
+
+    // Hook Illustration (Merged)
+    illuContainer: { height: 260, justifyContent: 'center', alignItems: 'center', marginBottom: 40 },
+    hookWrapper: { width: '100%', padding: 20, alignItems: 'center' },
+    miniMap: { width: '80%', height: 100, backgroundColor: DESIGN.colors.border, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
+    pinBadge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 99, ...Platform.select({ ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 10 }, android: { elevation: 4 } }) },
+    pinText: { fontSize: 13, fontWeight: '700' },
+    timeline: { width: '90%', height: 40, justifyContent: 'center' },
+    timelineTrack: { height: 4, backgroundColor: DESIGN.colors.border, borderRadius: 2, width: '100%' },
+    timelineDot: { position: 'absolute', top: 15, width: 10, height: 10, borderRadius: 5, backgroundColor: DESIGN.colors.primary, borderWidth: 2, borderColor: '#FFF' },
+    timelineLabel: { position: 'absolute', top: 45, right: 0, fontSize: 11, fontWeight: '600', color: DESIGN.colors.primary },
+    emptyQueue: { position: 'absolute', top: 0, right: 10, padding: 12, backgroundColor: '#FFF', borderRadius: 16, ...Platform.select({ ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 5 }, android: { elevation: 2 } }) },
+    slashLine: { position: 'absolute', width: '100%', height: 2, backgroundColor: DESIGN.colors.error, top: '50%', transform: [{ rotate: '-45deg' }] },
+    illuGlow: { position: 'absolute', width: 280, height: 280, borderRadius: 140, backgroundColor: DESIGN.colors.primary, opacity: 0.04 },
+
+    // Setup Grouping
+    setupContainer: { gap: 24, marginTop: 8 },
+    setupGroup: { gap: 12 },
+    groupLabel: { ...DESIGN.typography.label, color: DESIGN.colors.textSecondary, textTransform: 'uppercase', letterSpacing: 1 },
+    langGrid: { flexDirection: 'row', gap: 10 },
+    langChip: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, backgroundColor: '#FFF', borderWidth: 1, borderColor: DESIGN.colors.border },
+    langChipActive: { backgroundColor: DESIGN.colors.primary, borderColor: DESIGN.colors.primary },
+    langChipText: { fontSize: 14, fontWeight: '500', color: DESIGN.colors.textPrimary },
+    permItem: { flexDirection: 'row', alignItems: 'center', gap: 16, backgroundColor: '#FFF', padding: 16, borderRadius: 16, borderWidth: 1, borderColor: DESIGN.colors.border },
+    permIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#F0F7FB', alignItems: 'center', justifyContent: 'center' },
+    permTitle: { ...DESIGN.typography.label, color: DESIGN.colors.textPrimary },
+    permSub: { fontSize: 12, color: DESIGN.colors.textSecondary },
+
+    // Decision Gap
+    decisionStack: { gap: 16 },
+    decisionCard: { flexDirection: 'row', alignItems: 'center', gap: 16, padding: 24, borderRadius: 24 },
+    decisionPrimary: { backgroundColor: DESIGN.colors.primary },
+    decisionEmergency: { backgroundColor: '#FFF', borderWidth: 1.5, borderColor: '#FED7D7' },
+    decisionIcon: { width: 48, height: 48, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
+    decisionTitle: { fontSize: 20, fontWeight: '700', color: '#FFF' },
+    decisionSub: { fontSize: 14, color: 'rgba(255,255,255,0.7)', marginTop: 2 },
+
+    // Confidence Doctor Card
+    doctorCard: { width: '100%', backgroundColor: '#FFF', padding: 16, borderRadius: 20, flexDirection: 'row', gap: 16, alignItems: 'center', borderWidth: 1, borderColor: DESIGN.colors.border, ...Platform.select({ ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.08, shadowRadius: 15 }, android: { elevation: 6 } }) },
+    docCardPeek: { position: 'absolute', top: 20, width: '90%', zIndex: -1, opacity: 0.5, transform: [{ scale: 0.95 }, { translateY: 40 }] },
+    docAvatar: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#EAEEF2' },
+    docName: { fontSize: 18, fontWeight: '600' },
+    docSub: { fontSize: 14, color: DESIGN.colors.textSecondary, marginBottom: 4 },
+    ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+    ratingText: { fontSize: 13, color: DESIGN.colors.textSecondary },
+    bestMatchBadge: { position: 'absolute', top: -12, right: 16, backgroundColor: '#E3F2FD', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 8 },
+    bestMatchText: { color: '#0055CC', fontSize: 12, fontWeight: '700' },
 });

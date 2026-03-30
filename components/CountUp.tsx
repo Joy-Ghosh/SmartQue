@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { TextStyle, TextInput } from 'react-native';
+import { TextStyle, TextInput, StyleProp } from 'react-native';
 import Animated, { 
   useSharedValue, 
   useAnimatedStyle, 
@@ -13,7 +13,7 @@ const AnimatedTextInput = Animated.createAnimatedComponent(TextInput);
 interface CountUpProps {
   value: number;
   duration?: number;
-  style?: TextStyle;
+  style?: StyleProp<TextStyle>;
   suffix?: string;
 }
 
@@ -44,7 +44,7 @@ export const CountUp: React.FC<CountUpProps> = ({
       underlineColorAndroid="transparent"
       editable={false}
       defaultValue={derivedValue.value} // Use defaultValue for initial render
-      style={[style, { color: style?.color || 'black' }]}
+      style={[{ color: 'black' }, style]}
       animatedProps={animatedProps}
     />
   );
